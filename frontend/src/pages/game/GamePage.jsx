@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Chess } from 'chess.js';
 import { io } from 'socket.io-client';
 import { API_URL, getToken } from '../../api/client';
 import { abortBotGame, analyzeGame, closeGame, createBotGame, createGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
@@ -204,11 +205,41 @@ export default function GamePage({ user, games, refresh }) {
 
   function handleBoardMove(move) {
     setMessage('');
+    const previousGame = game;
+
+    try {
+      const chess = new Chess(game.current_fen);
+      const played = chess.move({ from: move.from, to: move.to, promotion: move.promotion || undefined });
+      if (played) {
+        const optimisticMove = {
+          id: `pending-${Date.now()}`,
+          move_number: (game.moves?.length || 0) + 1,
+          from_square: played.from,
+          to_square: played.to,
+          promotion: played.promotion || null,
+          san: played.san,
+          fen_after: chess.fen(),
+          player_id: user.id,
+          player_name: user.name,
+        };
+
+        setGame({
+          ...game,
+          current_fen: chess.fen(),
+          pgn: chess.pgn(),
+          moves: [...(game.moves || []), optimisticMove],
+        });
+      }
+    } catch {
+      // The server remains the source of truth for illegal or stale moves.
+    }
+
     setIsBotThinking(isBotGame);
     socketRef.current?.emit('game:move', { gameId: selectedId, ...move }, (response) => {
       setMessage(response.ok ? 'Move saved.' : response.message);
       if (!response.ok) {
         setIsBotThinking(false);
+        if (previousGame) setGame(previousGame);
         notify?.(response.message || 'Move failed.', 'error');
       }
       if (response.game) setGame(response.game);
