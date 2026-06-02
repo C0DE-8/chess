@@ -24,3 +24,16 @@
   text-transform: uppercase;
   font-size: 12px;
 }
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 12px;
+  }
+
+  .panel th,
+  .panel td {
+    padding: 10px 8px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+}

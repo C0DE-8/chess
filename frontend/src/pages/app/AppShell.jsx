@@ -18,6 +18,7 @@ export default function AppShell({ page, routes, session }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(session.user);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [workspace, setWorkspace] = useState({
     dashboard: {},
     games: [],
@@ -57,6 +58,10 @@ export default function AppShell({ page, routes, session }) {
     fetchWorkspace().then(applyWorkspace).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [location.pathname]);
+
   const availableRoutes = routes.filter((route) => !route.publicOnly && (!route.adminOnly || user.role !== 'player'));
   const activeRoute = availableRoutes.find((route) => route.path === location.pathname) || availableRoutes[0];
 
@@ -65,19 +70,56 @@ export default function AppShell({ page, routes, session }) {
     navigate('/auth', { replace: true });
   }
 
+  function goToRoute(path) {
+    navigate(path);
+    setIsMobileNavOpen(false);
+  }
+
+  function renderNavButtons() {
+    return availableRoutes.map((route) => (
+      <button
+        className={activeRoute.path === route.path ? styles.active : ''}
+        onClick={() => goToRoute(route.path)}
+        key={route.path}
+        type="button"
+      >
+        {route.label}
+      </button>
+    ));
+  }
+
   return (
     <div className={styles.shell}>
+      <header className={styles.mobileHeader}>
+        <div className={styles.mobileBrand}>
+          <img src={logo} alt="" />
+          <div>KnightClub<span>{activeRoute.label}</span></div>
+        </div>
+        <button
+          className={styles.menuButton}
+          type="button"
+          aria-expanded={isMobileNavOpen}
+          aria-controls="mobile-navigation"
+          onClick={() => setIsMobileNavOpen((isOpen) => !isOpen)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+      </header>
+      {isMobileNavOpen && (
+        <nav className={styles.mobileNav} id="mobile-navigation" aria-label="Primary navigation">
+          <div className={styles.mobileNavGrid}>{renderNavButtons()}</div>
+          <button className={styles.logoutButton} onClick={logout} type="button">Log out</button>
+        </nav>
+      )}
       <aside className={styles.sidebar}>
         <div className={styles.clubTitle}>
           <img src={logo} alt="" />
           <div>KnightClub<span>{user.role.replace('_', ' ')}</span></div>
         </div>
-        {availableRoutes.map((route) => (
-          <button className={activeRoute.path === route.path ? styles.active : ''} onClick={() => navigate(route.path)} key={route.path} type="button">
-            {route.label}
-          </button>
-        ))}
-        <button onClick={logout} type="button">Log out</button>
+        {renderNavButtons()}
+        <button className={styles.logoutButton} onClick={logout} type="button">Log out</button>
       </aside>
       <main className={styles.main}>
         <header className={styles.topbar}>

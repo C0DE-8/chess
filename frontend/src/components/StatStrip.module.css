@@ -30,3 +30,18 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+@media (max-width: 520px) {
+  .statStrip {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .statStrip div {
+    padding: 13px;
+  }
+
+  .statStrip strong {
+    font-size: 25px;
+  }
+}

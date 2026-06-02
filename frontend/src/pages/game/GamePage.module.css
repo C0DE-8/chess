@@ -171,8 +171,18 @@
   background: #252420;
 }
 
+.moves .latestMove {
+  background: rgba(129, 182, 76, 0.18);
+  color: #f6ffd8;
+  box-shadow: inset 3px 0 0 #81b64c;
+}
+
 .moves span {
   color: #858176;
+}
+
+.latestMove span {
+  color: #bfe18c;
 }
 
 @media (max-width: 1100px) {
@@ -182,5 +192,38 @@
 
   .sidePanel {
     min-height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    min-height: auto;
+    padding: 10px;
+    border-radius: 0;
+    margin-inline: -12px;
+  }
+
+  .gameLayout {
+    gap: 14px;
+  }
+
+  .panelHead {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 13px;
+  }
+
+  .primary {
+    width: 100%;
+  }
+
+  .playerBar {
+    min-height: 42px;
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
   }
 }

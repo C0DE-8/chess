@@ -9,12 +9,12 @@ const pieces = {
   b: '♝',
   q: '♛',
   k: '♚',
-  P: '♟',
-  R: '♜',
-  N: '♞',
-  B: '♝',
-  Q: '♛',
-  K: '♚',
+  P: '♙',
+  R: '♖',
+  N: '♘',
+  B: '♗',
+  Q: '♕',
+  K: '♔',
 };
 
 function fenSquares(fen) {
@@ -60,7 +60,7 @@ function boardIndexes(orientation) {
   return orientation === 'black' ? indexes.reverse() : indexes;
 }
 
-export default function ChessBoard({ fen, userColor, isPlayable, orientation = 'white', onMove }) {
+export default function ChessBoard({ fen, userColor, isPlayable, orientation = 'white', lastMove, onMove }) {
   const [selected, setSelected] = useState(null);
   const boardFen = fen || '8/8/8/8/8/8/8/8 w - - 0 1';
   const squares = useMemo(() => fenSquares(boardFen), [boardFen]);
@@ -75,6 +75,8 @@ export default function ChessBoard({ fen, userColor, isPlayable, orientation = '
     }
   }, [boardFen, isPlayable, selected]);
   const legalTargets = new Set(legalMoves.map((move) => move.to));
+  const legalCaptures = new Set(legalMoves.filter((move) => move.captured).map((move) => move.to));
+  const lastMoveSquares = new Set([lastMove?.from_square, lastMove?.to_square].filter(Boolean));
 
   function handleSquareClick(index) {
     if (!isPlayable) return;
@@ -104,9 +106,12 @@ export default function ChessBoard({ fen, userColor, isPlayable, orientation = '
         const renderFile = renderIndex % 8;
         const renderRank = Math.floor(renderIndex / 8);
         const classNames = [
+          styles.square,
           (Math.floor(index / 8) + index) % 2 ? styles.dark : styles.light,
           selected === square ? styles.selected : '',
+          lastMoveSquares.has(square) ? styles.lastMove : '',
           legalTargets.has(square) ? styles.legal : '',
+          legalCaptures.has(square) ? styles.capture : '',
         ].filter(Boolean).join(' ');
 
         return (
@@ -119,6 +124,7 @@ export default function ChessBoard({ fen, userColor, isPlayable, orientation = '
             type="button"
           >
             <span className={`${styles.piece} ${pieceClass(piece)}`}>{piece ? pieces[piece] : ''}</span>
+            {legalTargets.has(square) && <span className={styles.legalMark} aria-hidden="true" />}
           </button>
         );
       })}

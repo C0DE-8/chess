@@ -33,6 +33,7 @@ export default function GamePage({ user, games, refresh }) {
   const socketRef = useRef(null);
 
   const userColor = useMemo(() => playerColor(game, user.id), [game, user.id]);
+  const lastMove = useMemo(() => game?.moves?.at(-1) || null, [game?.moves]);
   const orientation = userColor === 'black' ? 'black' : 'white';
   const topColor = orientation === 'black' ? 'white' : 'black';
   const bottomColor = orientation === 'black' ? 'black' : 'white';
@@ -108,6 +109,7 @@ export default function GamePage({ user, games, refresh }) {
             userColor={userColor}
             orientation={orientation}
             isPlayable={isPlayable}
+            lastMove={lastMove}
             onMove={handleBoardMove}
           />
 
@@ -138,7 +140,12 @@ export default function GamePage({ user, games, refresh }) {
           <div className={styles.movePanel}>
             <h3>Moves</h3>
             <ol className={styles.moves}>
-              {(game?.moves || []).map((item) => <li key={item.id}><span>{item.move_number}.</span>{item.san}</li>)}
+              {(game?.moves || []).map((item) => (
+                <li className={item.id === lastMove?.id ? styles.latestMove : ''} key={item.id}>
+                  <span>{item.move_number}.</span>
+                  {item.san}
+                </li>
+              ))}
             </ol>
           </div>
 
