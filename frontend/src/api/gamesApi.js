@@ -15,8 +15,36 @@ export function createGame() {
   });
 }
 
+export function createBotGame(level) {
+  return apiRequest('/api/games/bot', {
+    method: 'POST',
+    body: JSON.stringify({ level }),
+  });
+}
+
 export function joinGame(id) {
   return apiRequest(`/api/games/${id}/join`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function closeGame(id) {
+  return apiRequest(`/api/games/${id}/close`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function resignGame(id) {
+  return apiRequest(`/api/games/${id}/resign`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function abortBotGame(id) {
+  return apiRequest(`/api/games/${id}/abort`, {
     method: 'POST',
     body: JSON.stringify({}),
   });

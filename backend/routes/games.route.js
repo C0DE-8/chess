@@ -2,6 +2,7 @@ const express = require('express');
 const { query } = require('../config/database');
 const { authenticate, requireActive, requireAdmin } = require('../middleware/auth');
 const { STARTING_FEN, completeGame, getGameWithMoves } = require('../lib/game');
+const { BOT_LEVELS, botName, isBotGame, normalizeBotLevel } = require('../lib/bot');
 const { logActivity } = require('../lib/activity');
 
 const router = express.Router();
@@ -18,7 +19,7 @@ router.get('/', async (req, res, next) => {
     }
 
     const games = await query(
-      `SELECT g.id, g.status, g.result, g.result_reason, g.white_player_id, g.black_player_id,
+      `SELECT g.id, g.status, g.result, g.result_reason, g.white_player_id, g.black_player_id, g.created_by,
               g.current_fen, g.created_at, g.completed_at,
               white.name AS white_name, black.name AS black_name
        FROM games g
@@ -29,7 +30,7 @@ router.get('/', async (req, res, next) => {
        LIMIT 80`,
       params,
     );
-    res.json({ games });
+    res.json({ games: games.map((game) => ({ ...game, black_name: botName(game) || game.black_name })) });
   } catch (error) {
     next(error);
   }
@@ -48,6 +49,21 @@ router.post('/', requireActive, async (req, res, next) => {
   }
 });
 
+router.post('/bot', requireActive, async (req, res, next) => {
+  try {
+    const level = normalizeBotLevel(req.body.level);
+    const result = await query(
+      `INSERT INTO games (white_player_id, black_player_id, created_by, status, current_fen, result_reason)
+       VALUES (?, NULL, ?, 'active', ?, ?)`,
+      [req.user.id, req.user.id, STARTING_FEN, `bot:${level}`],
+    );
+    await logActivity(req.user.id, 'bot_game_created', 'game', result.insertId, { level });
+    res.status(201).json({ id: result.insertId, level, levels: BOT_LEVELS, message: 'Bot game created.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/:id/join', requireActive, async (req, res, next) => {
   try {
     const games = await query('SELECT * FROM games WHERE id = ?', [req.params.id]);
@@ -59,6 +75,27 @@ router.post('/:id/join', requireActive, async (req, res, next) => {
     await query('UPDATE games SET black_player_id = ?, status = ? WHERE id = ?', [req.user.id, 'active', game.id]);
     await logActivity(req.user.id, 'game_joined', 'game', game.id);
     res.json({ message: 'Game joined.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/close', requireActive, async (req, res, next) => {
+  try {
+    const games = await query('SELECT * FROM games WHERE id = ?', [req.params.id]);
+    if (!games.length) return res.status(404).json({ message: 'Game not found.' });
+    const game = games[0];
+    if (game.created_by !== req.user.id) return res.status(403).json({ message: 'Only the creator can close this game.' });
+    if (game.status !== 'open' || game.black_player_id) {
+      return res.status(409).json({ message: 'Only open games with no joined player can be closed.' });
+    }
+
+    await query(
+      "UPDATE games SET status = 'cancelled', result = 'abandoned', result_reason = 'closed_by_creator', completed_at = NOW() WHERE id = ?",
+      [game.id],
+    );
+    await logActivity(req.user.id, 'game_closed', 'game', game.id);
+    res.json({ message: 'Game closed.' });
   } catch (error) {
     next(error);
   }
@@ -82,6 +119,26 @@ router.post('/:id/resign', requireActive, async (req, res, next) => {
   }
 });
 
+router.post('/:id/abort', requireActive, async (req, res, next) => {
+  try {
+    const games = await query('SELECT * FROM games WHERE id = ?', [req.params.id]);
+    if (!games.length) return res.status(404).json({ message: 'Game not found.' });
+    const game = games[0];
+    if (game.white_player_id !== req.user.id) return res.status(403).json({ message: 'Only the bot game player can abort this game.' });
+    if (!isBotGame(game)) return res.status(409).json({ message: 'Only bot games can be aborted.' });
+    if (game.status !== 'active') return res.status(409).json({ message: 'Only active bot games can be aborted.' });
+
+    await query(
+      "UPDATE games SET status = 'cancelled', result = 'abandoned', result_reason = 'bot_aborted', completed_at = NOW() WHERE id = ?",
+      [game.id],
+    );
+    await logActivity(req.user.id, 'bot_game_aborted', 'game', game.id);
+    res.json({ message: 'Bot game aborted.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/admin/all', requireAdmin, async (_req, res, next) => {
   try {
     const games = await query(
@@ -91,7 +148,7 @@ router.get('/admin/all', requireAdmin, async (_req, res, next) => {
        LEFT JOIN users black ON black.id = g.black_player_id
        ORDER BY g.created_at DESC`,
     );
-    res.json({ games });
+    res.json({ games: games.map((game) => ({ ...game, black_name: botName(game) || game.black_name })) });
   } catch (error) {
     next(error);
   }

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { Chess } = require('chess.js');
 const { pool, query } = require('../config/database');
+const { applyBotMoveIfNeeded } = require('../lib/bot');
 const { completeGame, getGameWithMoves } = require('../lib/game');
 
 async function socketUser(token) {
@@ -80,8 +81,20 @@ function socketEvents(io) {
           finished = await completeGame(gameId, 'draw', chess.isStalemate() ? 'stalemate' : 'draw', socket.user.id);
         }
 
+        let botMove = null;
+        if (!finished) {
+          const botResult = await applyBotMoveIfNeeded(gameId);
+          botMove = botResult?.move || null;
+
+          if (botResult?.chess?.isCheckmate()) {
+            finished = await completeGame(gameId, botResult.chess.turn() === 'w' ? 'black_win' : 'white_win', 'checkmate');
+          } else if (botResult?.chess && (botResult.chess.isDraw() || botResult.chess.isStalemate())) {
+            finished = await completeGame(gameId, 'draw', botResult.chess.isStalemate() ? 'stalemate' : 'draw');
+          }
+        }
+
         const updated = await getGameWithMoves(gameId);
-        io.to(`game:${gameId}`).emit('game:updated', { game: updated, lastMove: move, finished });
+        io.to(`game:${gameId}`).emit('game:updated', { game: updated, lastMove: botMove || move, finished });
         callback?.({ ok: true, game: updated });
       } catch (error) {
         await connection.rollback();

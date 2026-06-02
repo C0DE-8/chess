@@ -1,12 +1,18 @@
 const { Chess } = require('chess.js');
 const { pool, query } = require('../config/database');
 const { logActivity } = require('./activity');
+const { botName, isBotGame } = require('./bot');
 
 const STARTING_FEN = new Chess().fen();
 const RATING_STEP = 16;
 const MIN_RATING = 100;
 
 async function updateStatsForResult(connection, game) {
+  if (isBotGame(game)) {
+    await updateStatsForBotResult(connection, game);
+    return;
+  }
+
   if (game.result === 'draw') {
     await connection.execute(
       'UPDATE users SET games_played = games_played + 1, draws = draws + 1 WHERE id IN (?, ?)',
@@ -25,6 +31,33 @@ async function updateStatsForResult(connection, game) {
     'UPDATE users SET games_played = games_played + 1, losses = losses + 1, rating = GREATEST(?, rating - ?) WHERE id = ?',
     [MIN_RATING, RATING_STEP, game.loser_id],
   );
+}
+
+async function updateStatsForBotResult(connection, game) {
+  if (!game.white_player_id) return;
+
+  if (game.result === 'draw') {
+    await connection.execute(
+      'UPDATE users SET games_played = games_played + 1, draws = draws + 1 WHERE id = ?',
+      [game.white_player_id],
+    );
+    return;
+  }
+
+  if (game.result === 'white_win') {
+    await connection.execute(
+      'UPDATE users SET games_played = games_played + 1, wins = wins + 1, rating = rating + ? WHERE id = ?',
+      [RATING_STEP, game.white_player_id],
+    );
+    return;
+  }
+
+  if (game.result === 'black_win') {
+    await connection.execute(
+      'UPDATE users SET games_played = games_played + 1, losses = losses + 1, rating = GREATEST(?, rating - ?) WHERE id = ?',
+      [MIN_RATING, RATING_STEP, game.white_player_id],
+    );
+  }
 }
 
 async function completeGame(gameId, result, reason, actorId = null) {
@@ -87,7 +120,8 @@ async function getGameWithMoves(gameId) {
     [gameId],
   );
 
-  return { ...games[0], moves };
+  const game = games[0];
+  return { ...game, black_name: botName(game) || game.black_name, moves };
 }
 
 module.exports = {

@@ -93,6 +93,22 @@
   font-weight: 900;
 }
 
+.secondary,
+.actionPanel button {
+  border: 0;
+  border-radius: 7px;
+  padding: 10px 12px;
+  background: #e7dcc6;
+  color: #171511;
+  font-weight: 900;
+}
+
+.secondary:disabled,
+.primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .notice {
   margin: 0 14px;
   padding: 11px 12px;
@@ -138,6 +154,46 @@
   margin: 0 14px;
   color: #d3d0c6;
   font-weight: 800;
+}
+
+.botPanel {
+  margin: 0 14px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  border: 1px solid #37352f;
+  border-radius: 7px;
+  background: #292823;
+}
+
+.botPanel label {
+  display: grid;
+  gap: 6px;
+  color: #d3d0c6;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.botPanel select {
+  width: 100%;
+  border: 1px solid #444039;
+  border-radius: 7px;
+  padding: 10px 11px;
+  background: #1f1e1b;
+  color: #f3f2ed;
+  font-weight: 800;
+}
+
+.actionPanel {
+  margin: 0 14px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.actionPanel button {
+  background: #4a312c;
+  color: #ffe7de;
 }
 
 .movePanel {
@@ -215,6 +271,13 @@
 
   .primary {
     width: 100%;
+  }
+
+  .botPanel,
+  .actionPanel,
+  .notice,
+  .turnText {
+    margin-inline: 10px;
   }
 
   .playerBar {
