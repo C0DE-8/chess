@@ -11,6 +11,7 @@ import DashboardPage from '../dashboard/DashboardPage';
 import GamePage from '../game/GamePage';
 import HistoryPage from '../history/HistoryPage';
 import LeaderboardPage from '../leaderboard/LeaderboardPage';
+import ProfilePage from '../profile/ProfilePage';
 import TournamentsPage from '../tournaments/TournamentsPage';
 import logo from '../../assets/images/logo.png';
 import styles from './AppShell.module.css';
@@ -131,9 +132,10 @@ export default function AppShell({ page, routes, session }) {
             <p>{user.status === 'pending' ? 'Pending approval' : 'Club workspace'}</p>
             <h1>{activeRoute.label}</h1>
           </div>
-          <strong>{user.name}</strong>
+          <button className={styles.profileButton} onClick={() => goToRoute('/profile')} type="button">{user.name}</button>
         </header>
         {page === 'dashboard' && <DashboardPage user={user} workspace={workspace} />}
+        {page === 'profile' && <ProfilePage user={user} />}
         {page === 'game' && <GamePage user={user} games={workspace.games} refresh={refresh} />}
         {page === 'history' && <HistoryPage games={workspace.history} />}
         {page === 'leaderboard' && <LeaderboardPage leaderboard={workspace.leaderboard} />}

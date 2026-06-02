@@ -92,12 +92,16 @@
   line-height: 1.08;
 }
 
-.topbar strong {
+.profileButton {
+  border: 0;
   padding: 10px 12px;
   border-radius: 7px;
   background: #fffaf1;
+  color: #201b16;
+  font-weight: 900;
   max-width: 260px;
   overflow-wrap: anywhere;
+  text-align: left;
 }
 
 @media (max-width: 1024px) {
@@ -186,7 +190,7 @@
 
   .mobileNavGrid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 8px;
   }
 
@@ -199,6 +203,7 @@
     color: #f7f1e5;
     font-size: 13px;
     font-weight: 900;
+    text-align: left;
   }
 
   .mobileNav .active,
@@ -228,15 +233,11 @@
 }
 
 @media (max-width: 720px) {
-  .mobileNavGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .topbar {
     flex-direction: column;
   }
 
-  .topbar strong {
+  .profileButton {
     max-width: 100%;
   }
 }

@@ -55,6 +55,7 @@ export default function GamePage({ user, games, refresh }) {
   const [isBotThinking, setIsBotThinking] = useState(false);
   const [analysis, setAnalysis] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [dismissedWinnerGameId, setDismissedWinnerGameId] = useState(null);
   const socketRef = useRef(null);
   const { notify } = useToast();
 
@@ -73,6 +74,8 @@ export default function GamePage({ user, games, refresh }) {
     && userColor
     && turnColor(game.current_fen) === userColor,
   );
+  const gameAlert = useMemo(() => buildGameAlert(game), [game]);
+  const showWinnerModal = Boolean(game?.status === 'completed' && dismissedWinnerGameId !== game.id);
 
   useEffect(() => {
     if (!selectedId && games[0]?.id) {
@@ -83,6 +86,7 @@ export default function GamePage({ user, games, refresh }) {
   useEffect(() => {
     if (!selectedId) return;
     setAnalysis([]);
+    setDismissedWinnerGameId(null);
     getGame(selectedId).then((data) => setGame(data.game)).catch(() => setGame(null));
   }, [selectedId]);
 
@@ -277,6 +281,13 @@ export default function GamePage({ user, games, refresh }) {
             )}
           </div>
 
+          {gameAlert && (
+            <div className={`${styles.statusAlert} ${styles[gameAlert.type] || ''}`}>
+              <strong>{gameAlert.title}</strong>
+              <span>{gameAlert.body}</span>
+            </div>
+          )}
+
           <ChessBoard
             fen={game?.current_fen}
             userColor={userColor}
@@ -296,6 +307,17 @@ export default function GamePage({ user, games, refresh }) {
               <span className={styles.thinkingBubble}>Bot is thinking</span>
             )}
           </div>
+
+          {showWinnerModal && (
+            <div className={styles.winnerOverlay} role="dialog" aria-modal="true" aria-labelledby="winner-title">
+              <div className={styles.winnerModal}>
+                <p>{game.result_reason || 'Game complete'}</p>
+                <h3 id="winner-title">{winnerText(game)}</h3>
+                <span>{game.white_name || 'White'} vs {game.black_name || 'Black'}</span>
+                <button onClick={() => setDismissedWinnerGameId(game.id)} type="button">Close</button>
+              </div>
+            </div>
+          )}
         </div>
 
         <aside className={styles.sidePanel}>
@@ -397,4 +419,39 @@ function formatEvaluation(evaluation) {
   if (evaluation.type === 'mate') return `Mate ${evaluation.value}`;
   if (evaluation.type === 'cp') return `${evaluation.value > 0 ? '+' : ''}${(evaluation.value / 100).toFixed(2)}`;
   return 'No score';
+}
+
+function buildGameAlert(game) {
+  if (!game?.current_fen) return null;
+  if (game.status === 'completed') {
+    const isCheckmateFinish = game.result_reason === 'checkmate';
+    return {
+      type: game.result === 'draw' ? 'drawAlert' : 'mateAlert',
+      title: game.result === 'draw' ? 'Draw' : isCheckmateFinish ? 'Checkmate' : 'Game over',
+      body: winnerText(game),
+    };
+  }
+  if (game.status === 'cancelled') {
+    return { type: 'drawAlert', title: 'Game closed', body: game.result_reason || 'This game is no longer active.' };
+  }
+
+  try {
+    const chess = new Chess(game.current_fen);
+    if (chess.isCheckmate()) return { type: 'mateAlert', title: 'Checkmate', body: winnerText(game) };
+    if (chess.isStalemate()) return { type: 'drawAlert', title: 'Stalemate', body: 'No legal moves. The game is drawn.' };
+    if (chess.isDraw()) return { type: 'drawAlert', title: 'Draw', body: 'The position is drawn.' };
+    if (chess.inCheck()) return { type: 'checkAlert', title: 'Check', body: `${turnColor(game.current_fen)} is in check.` };
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function winnerText(game) {
+  if (!game) return 'Game complete';
+  if (game.result === 'draw') return 'The game ended in a draw.';
+  if (game.result === 'white_win') return `${game.white_name || 'White'} wins.`;
+  if (game.result === 'black_win') return `${game.black_name || 'Black'} wins.`;
+  if (game.result === 'abandoned') return 'The game was closed.';
+  return 'Game complete.';
 }
