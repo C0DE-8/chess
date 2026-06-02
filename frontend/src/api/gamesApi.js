@@ -49,3 +49,7 @@ export function abortBotGame(id) {
     body: JSON.stringify({}),
   });
 }
+
+export function analyzeGame(id, depth = 8) {
+  return apiRequest(`/api/games/${id}/analyze?depth=${depth}`);
+}

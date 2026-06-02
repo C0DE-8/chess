@@ -3,6 +3,7 @@ const { query } = require('../config/database');
 const { authenticate, requireActive, requireAdmin } = require('../middleware/auth');
 const { STARTING_FEN, completeGame, getGameWithMoves } = require('../lib/game');
 const { BOT_LEVELS, botName, isBotGame, normalizeBotLevel } = require('../lib/bot');
+const { evaluateFen, stockfishAvailable } = require('../lib/stockfish');
 const { logActivity } = require('../lib/activity');
 
 const router = express.Router();
@@ -151,6 +152,41 @@ router.get('/admin/all', requireAdmin, async (_req, res, next) => {
     res.json({ games: games.map((game) => ({ ...game, black_name: botName(game) || game.black_name })) });
   } catch (error) {
     next(error);
+  }
+});
+
+router.get('/:id/analyze', async (req, res, next) => {
+  try {
+    const game = await getGameWithMoves(req.params.id);
+    if (!game) return res.status(404).json({ message: 'Game not found.' });
+
+    const isParticipant = [game.white_player_id, game.black_player_id].includes(req.user.id);
+    if (req.user.role === 'player' && !isParticipant) {
+      return res.status(403).json({ message: 'You can only analyze your own games.' });
+    }
+
+    if (!stockfishAvailable()) {
+      return res.status(503).json({ message: 'Stockfish is not configured on this server.' });
+    }
+
+    const depth = Math.min(Math.max(Number(req.query.depth) || 8, 1), 14);
+    const moves = game.moves.slice(0, 80);
+    const analysis = [];
+
+    for (const move of moves) {
+      const evaluation = await evaluateFen(move.fen_after, depth);
+      analysis.push({
+        moveId: move.id,
+        moveNumber: move.move_number,
+        san: move.san,
+        fen: move.fen_after,
+        evaluation,
+      });
+    }
+
+    return res.json({ gameId: game.id, depth, analysis });
+  } catch (error) {
+    return next(error);
   }
 });
 

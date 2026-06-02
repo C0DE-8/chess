@@ -1,5 +1,6 @@
 const { Chess } = require('chess.js');
 const { query } = require('../config/database');
+const { bestMove } = require('./stockfish');
 
 const BOT_LEVELS = ['newbie', 'beginner', 'novice', 'intermediate', 'advanced'];
 const BOT_LEVEL_LABELS = {
@@ -31,9 +32,12 @@ function botName(game) {
   return null;
 }
 
-function chooseBotMove(chess, level) {
+async function chooseBotMove(chess, level) {
   const moves = chess.moves({ verbose: true });
   if (!moves.length) return null;
+
+  const engineMove = await chooseStockfishMove(chess, level, moves);
+  if (engineMove) return engineMove;
 
   if (level === 'newbie') return randomMove(moves);
 
@@ -46,6 +50,25 @@ function chooseBotMove(chess, level) {
   return scored[0].move;
 }
 
+async function chooseStockfishMove(chess, level, moves) {
+  try {
+    const uciMove = await bestMove(chess.fen(), level);
+    if (!uciMove) return null;
+
+    const from = uciMove.slice(0, 2);
+    const to = uciMove.slice(2, 4);
+    const promotion = uciMove[4];
+
+    return moves.find((move) => (
+      move.from === from
+      && move.to === to
+      && (!promotion || move.promotion === promotion)
+    )) || null;
+  } catch {
+    return null;
+  }
+}
+
 async function applyBotMoveIfNeeded(gameId) {
   const games = await query('SELECT * FROM games WHERE id = ?', [gameId]);
   const game = games[0];
@@ -54,7 +77,7 @@ async function applyBotMoveIfNeeded(gameId) {
   const chess = new Chess(game.current_fen);
   if (chess.turn() !== 'b' || chess.isGameOver()) return null;
 
-  const move = chooseBotMove(chess, botLevel(game));
+  const move = await chooseBotMove(chess, botLevel(game));
   if (!move) return null;
 
   chess.move(move);

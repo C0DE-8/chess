@@ -73,6 +73,7 @@
 
 .panelHead h2,
 .movePanel h3,
+.analysisPanel h3,
 .gameList h3 {
   margin: 0;
   color: #f7f6f1;
@@ -117,6 +118,15 @@
   color: #e7dcc6;
 }
 
+.thinking {
+  margin: 0 14px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: rgba(129, 182, 76, 0.14);
+  color: #d9f5b8;
+  font-weight: 900;
+}
+
 .gameList {
   padding: 0 14px 14px;
   display: grid;
@@ -124,14 +134,21 @@
   gap: 8px;
 }
 
-.gameRow {
+.gameRowWrap {
   border: 1px solid #37352f;
   border-radius: 4px;
+  overflow: hidden;
+  background: #2a2925;
+}
+
+.gameRow {
+  width: 100%;
+  border: 0;
   padding: 11px;
   display: grid;
   gap: 4px;
   text-align: left;
-  background: #2a2925;
+  background: transparent;
   color: #e9e8e2;
 }
 
@@ -140,14 +157,24 @@
   box-shadow: inset 3px 0 0 #81b64c;
 }
 
-.gameRow small,
-.gameRow em {
+.gameRow small {
   color: #aaa69b;
 }
 
-.gameRow em {
+.gameRowActions {
+  padding: 0 10px 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.gameRowActions button {
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 9px;
+  background: #3d4134;
+  color: #eaf4d7;
   font-weight: 900;
-  font-style: normal;
 }
 
 .turnText {
@@ -204,8 +231,27 @@
   border-bottom: 1px solid #302f2b;
 }
 
-.movePanel h3 {
+.movePanelHead {
   padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.movePanelHead button {
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: #e7dcc6;
+  color: #171511;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.movePanelHead button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .moves {
@@ -238,6 +284,38 @@
 }
 
 .latestMove span {
+  color: #bfe18c;
+}
+
+.analysisPanel {
+  margin: 0 14px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  border: 1px solid #37352f;
+  border-radius: 7px;
+  background: #292823;
+}
+
+.analysisPanel ol {
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.analysisPanel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid #37352f;
+  color: #dfddd5;
+}
+
+.analysisPanel strong {
   color: #bfe18c;
 }
 
@@ -275,7 +353,9 @@
 
   .botPanel,
   .actionPanel,
+  .analysisPanel,
   .notice,
+  .thinking,
   .turnText {
     margin-inline: 10px;
   }

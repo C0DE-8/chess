@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { API_URL, getToken } from '../../api/client';
-import { abortBotGame, closeGame, createBotGame, createGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
+import { abortBotGame, analyzeGame, closeGame, createBotGame, createGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
 import ChessBoard from '../../ui/game/ChessBoard';
 import styles from './GamePage.module.css';
 
@@ -12,6 +12,8 @@ const botLevels = [
   { value: 'intermediate', label: 'Intermediate' },
   { value: 'advanced', label: 'Advanced' },
 ];
+
+const botLevelLabels = Object.fromEntries(botLevels.map((level) => [level.value, level.label]));
 
 function playerColor(game, userId) {
   if (!game) return null;
@@ -34,16 +36,28 @@ function playerId(game, color) {
   return color === 'white' ? game.white_player_id : game.black_player_id;
 }
 
+function isBotRecord(game) {
+  return Boolean(game?.black_player_id == null && String(game?.result_reason || '').startsWith('bot:'));
+}
+
+function botLevelLabel(game) {
+  const level = String(game?.result_reason || '').replace('bot:', '');
+  return botLevelLabels[level] || 'Bot';
+}
+
 export default function GamePage({ user, games, refresh }) {
   const [selectedId, setSelectedId] = useState(games[0]?.id || '');
   const [game, setGame] = useState(null);
   const [message, setMessage] = useState('');
   const [botLevel, setBotLevel] = useState('beginner');
+  const [isBotThinking, setIsBotThinking] = useState(false);
+  const [analysis, setAnalysis] = useState([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const socketRef = useRef(null);
 
   const userColor = useMemo(() => playerColor(game, user.id), [game, user.id]);
   const lastMove = useMemo(() => game?.moves?.at(-1) || null, [game?.moves]);
-  const isBotGame = Boolean(game?.black_player_id == null && String(game?.result_reason || '').startsWith('bot:'));
+  const isBotGame = isBotRecord(game);
   const canCloseGame = Boolean(game?.status === 'open' && game.created_by === user.id && !game.black_player_id);
   const canResignGame = Boolean(game?.status === 'active' && userColor && !isBotGame);
   const canAbortBotGame = Boolean(game?.status === 'active' && isBotGame && game.white_player_id === user.id);
@@ -65,6 +79,7 @@ export default function GamePage({ user, games, refresh }) {
 
   useEffect(() => {
     if (!selectedId) return;
+    setAnalysis([]);
     getGame(selectedId).then((data) => setGame(data.game)).catch(() => setGame(null));
   }, [selectedId]);
 
@@ -75,9 +90,14 @@ export default function GamePage({ user, games, refresh }) {
     socket.emit('game:join', { gameId: selectedId }, (response) => {
       if (response?.game) setGame(response.game);
     });
-    socket.on('game:updated', ({ game: updated }) => {
+    socket.on('game:updated', ({ game: updated, pendingBotMove }) => {
       setGame(updated);
+      setIsBotThinking(Boolean(pendingBotMove));
       refresh();
+    });
+    socket.on('game:bot-error', ({ message: errorMessage }) => {
+      setIsBotThinking(false);
+      setMessage(errorMessage || 'Bot move failed.');
     });
     return () => {
       socket.disconnect();
@@ -106,9 +126,15 @@ export default function GamePage({ user, games, refresh }) {
 
   async function handleCloseGame() {
     if (!game) return;
-    await closeGame(game.id);
+    await handleCloseOpenGame(game.id);
+  }
+
+  async function handleCloseOpenGame(id) {
+    await closeGame(id);
     setMessage('Game closed.');
-    setGame({ ...game, status: 'cancelled', result: 'abandoned', result_reason: 'closed_by_creator' });
+    if (String(id) === String(game?.id)) {
+      setGame({ ...game, status: 'cancelled', result: 'abandoned', result_reason: 'closed_by_creator' });
+    }
     refresh();
   }
 
@@ -130,10 +156,26 @@ export default function GamePage({ user, games, refresh }) {
 
   function handleBoardMove(move) {
     setMessage('');
+    setIsBotThinking(isBotGame);
     socketRef.current?.emit('game:move', { gameId: selectedId, ...move }, (response) => {
       setMessage(response.ok ? 'Move saved.' : response.message);
+      if (!response.ok) setIsBotThinking(false);
       if (response.game) setGame(response.game);
     });
+  }
+
+  async function handleAnalyzeGame() {
+    if (!game) return;
+    setIsAnalyzing(true);
+    setMessage('');
+    try {
+      const data = await analyzeGame(game.id);
+      setAnalysis(data.analysis || []);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
   }
 
   return (
@@ -144,7 +186,7 @@ export default function GamePage({ user, games, refresh }) {
             <span className={styles.avatar}>{topColor === 'white' ? '♙' : '♟'}</span>
             <div>
               <strong>{playerName(game, topColor)}</strong>
-              <small>{topColor} {playerId(game, topColor) === user.id ? 'you' : ''}</small>
+              <small>{topColor} {playerId(game, topColor) === user.id ? 'you' : isBotGame && topColor === 'black' ? botLevelLabel(game) : ''}</small>
             </div>
           </div>
 
@@ -161,7 +203,7 @@ export default function GamePage({ user, games, refresh }) {
             <span className={styles.avatar}>{bottomColor === 'white' ? '♙' : '♟'}</span>
             <div>
               <strong>{playerName(game, bottomColor)}</strong>
-              <small>{bottomColor} {playerId(game, bottomColor) === user.id ? 'you' : ''}</small>
+              <small>{bottomColor} {playerId(game, bottomColor) === user.id ? 'you' : isBotGame && bottomColor === 'black' ? botLevelLabel(game) : ''}</small>
             </div>
           </div>
         </div>
@@ -180,6 +222,7 @@ export default function GamePage({ user, games, refresh }) {
             {game ? `${userColor || 'Spectator'} view. ${isPlayable ? 'Your move: click a piece.' : `Waiting for ${turnColor(game.current_fen)}.`}` : 'Choose an open game.'}
           </p>
           {message && <p className={styles.notice}>{message}</p>}
+          {isBotThinking && <p className={styles.thinking}>Stockfish is thinking...</p>}
 
           <div className={styles.botPanel}>
             <label>
@@ -200,7 +243,12 @@ export default function GamePage({ user, games, refresh }) {
           )}
 
           <div className={styles.movePanel}>
-            <h3>Moves</h3>
+            <div className={styles.movePanelHead}>
+              <h3>Moves</h3>
+              <button onClick={handleAnalyzeGame} disabled={!game?.moves?.length || isAnalyzing} type="button">
+                {isAnalyzing ? 'Analyzing' : 'Analyze'}
+              </button>
+            </div>
             <ol className={styles.moves}>
               {(game?.moves || []).map((item) => (
                 <li className={item.id === lastMove?.id ? styles.latestMove : ''} key={item.id}>
@@ -211,18 +259,53 @@ export default function GamePage({ user, games, refresh }) {
             </ol>
           </div>
 
+          {analysis.length > 0 && (
+            <div className={styles.analysisPanel}>
+              <h3>Stockfish Analysis</h3>
+              <ol>
+                {analysis.map((item) => (
+                  <li key={item.moveId}>
+                    <span>{item.moveNumber}. {item.san}</span>
+                    <strong>{formatEvaluation(item.evaluation)}</strong>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
           <div className={styles.gameList}>
             <h3>Club Games</h3>
-            {games.map((item) => (
-              <button className={String(item.id) === String(selectedId) ? `${styles.gameRow} ${styles.active}` : styles.gameRow} key={item.id} onClick={() => setSelectedId(item.id)} type="button">
-                <span>#{item.id} {item.white_name || 'Open'} vs {item.black_name || 'Waiting'}</span>
-                <small>{item.status}</small>
-                {item.status === 'open' && item.white_player_id !== user.id && <em onClick={(event) => { event.stopPropagation(); handleJoinGame(item.id); }}>Join</em>}
-              </button>
-            ))}
+            {games.map((item) => {
+              const botGame = isBotRecord(item);
+              const isSelected = String(item.id) === String(selectedId);
+              const canJoin = item.status === 'open' && item.white_player_id !== user.id;
+              const canClose = item.status === 'open' && item.created_by === user.id && !item.black_player_id;
+
+              return (
+                <div className={isSelected ? `${styles.gameRowWrap} ${styles.active}` : styles.gameRowWrap} key={item.id}>
+                  <button className={styles.gameRow} onClick={() => setSelectedId(item.id)} type="button">
+                    <span>#{item.id} {item.white_name || 'Open'} vs {item.black_name || 'Waiting'}</span>
+                    <small>{item.status}{botGame ? ` · ${botLevelLabel(item)}` : ''}</small>
+                  </button>
+                  {(canJoin || canClose) && (
+                    <div className={styles.gameRowActions}>
+                      {canJoin && <button onClick={() => handleJoinGame(item.id)} type="button">Join</button>}
+                      {canClose && <button onClick={() => handleCloseOpenGame(item.id)} type="button">Close</button>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </aside>
       </div>
     </section>
   );
+}
+
+function formatEvaluation(evaluation) {
+  if (!evaluation) return 'No score';
+  if (evaluation.type === 'mate') return `Mate ${evaluation.value}`;
+  if (evaluation.type === 'cp') return `${evaluation.value > 0 ? '+' : ''}${(evaluation.value / 100).toFixed(2)}`;
+  return 'No score';
 }

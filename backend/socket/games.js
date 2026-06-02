@@ -1,8 +1,10 @@
 const jwt = require('jsonwebtoken');
 const { Chess } = require('chess.js');
 const { pool, query } = require('../config/database');
-const { applyBotMoveIfNeeded } = require('../lib/bot');
+const { applyBotMoveIfNeeded, isBotGame } = require('../lib/bot');
 const { completeGame, getGameWithMoves } = require('../lib/game');
+
+const botJobs = new Set();
 
 async function socketUser(token) {
   if (!token) return null;
@@ -81,21 +83,14 @@ function socketEvents(io) {
           finished = await completeGame(gameId, 'draw', chess.isStalemate() ? 'stalemate' : 'draw', socket.user.id);
         }
 
-        let botMove = null;
-        if (!finished) {
-          const botResult = await applyBotMoveIfNeeded(gameId);
-          botMove = botResult?.move || null;
-
-          if (botResult?.chess?.isCheckmate()) {
-            finished = await completeGame(gameId, botResult.chess.turn() === 'w' ? 'black_win' : 'white_win', 'checkmate');
-          } else if (botResult?.chess && (botResult.chess.isDraw() || botResult.chess.isStalemate())) {
-            finished = await completeGame(gameId, 'draw', botResult.chess.isStalemate() ? 'stalemate' : 'draw');
-          }
-        }
-
+        const pendingBotMove = !finished && isBotGame(game);
         const updated = await getGameWithMoves(gameId);
-        io.to(`game:${gameId}`).emit('game:updated', { game: updated, lastMove: botMove || move, finished });
+        io.to(`game:${gameId}`).emit('game:updated', { game: updated, lastMove: move, finished, pendingBotMove });
         callback?.({ ok: true, game: updated });
+
+        if (pendingBotMove) {
+          scheduleBotMove(io, gameId);
+        }
       } catch (error) {
         await connection.rollback();
         callback?.({ ok: false, message: error.message || 'Move failed.' });
@@ -104,6 +99,32 @@ function socketEvents(io) {
       }
     });
   });
+}
+
+function scheduleBotMove(io, gameId) {
+  if (botJobs.has(gameId)) return;
+  botJobs.add(gameId);
+
+  setTimeout(async () => {
+    try {
+      const botResult = await applyBotMoveIfNeeded(gameId);
+      if (!botResult) return;
+
+      let finished = null;
+      if (botResult.chess.isCheckmate()) {
+        finished = await completeGame(gameId, botResult.chess.turn() === 'w' ? 'black_win' : 'white_win', 'checkmate');
+      } else if (botResult.chess.isDraw() || botResult.chess.isStalemate()) {
+        finished = await completeGame(gameId, 'draw', botResult.chess.isStalemate() ? 'stalemate' : 'draw');
+      }
+
+      const updated = await getGameWithMoves(gameId);
+      io.to(`game:${gameId}`).emit('game:updated', { game: updated, lastMove: botResult.move, finished, pendingBotMove: false });
+    } catch (error) {
+      io.to(`game:${gameId}`).emit('game:bot-error', { message: error.message || 'Bot move failed.' });
+    } finally {
+      botJobs.delete(gameId);
+    }
+  }, 150);
 }
 
 module.exports = { wireGameSockets };
