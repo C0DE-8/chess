@@ -100,6 +100,44 @@
   overflow-wrap: anywhere;
 }
 
+.toast {
+  position: fixed;
+  right: 22px;
+  top: 22px;
+  z-index: 40;
+  width: min(360px, calc(100vw - 32px));
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 7px;
+  background: #183d3a;
+  color: #fffaf1;
+  box-shadow: 0 16px 34px rgba(26, 31, 27, 0.22);
+}
+
+.toast span {
+  font-weight: 850;
+}
+
+.toast button {
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font-weight: 900;
+}
+
+.success {
+  background: #2f6336;
+}
+
+.error {
+  background: #843b33;
+}
+
 @media (max-width: 1024px) {
   .shell {
     grid-template-columns: 1fr;
@@ -215,6 +253,13 @@
 
   .main {
     padding: 22px 18px 28px;
+  }
+
+  .toast {
+    top: 78px;
+    right: 12px;
+    left: 12px;
+    width: auto;
   }
 
   .topbar {

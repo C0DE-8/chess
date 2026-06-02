@@ -86,8 +86,11 @@ app.use((req, res) => {
 
 app.use((error, req, res, _next) => {
   logError(error, requestContext(req));
-  res.status(500).json({
-    message: 'KnightClub hit a server error.',
+  const status = Number(error.status || error.statusCode || 500);
+  const isPublicError = status >= 400 && status < 500;
+
+  res.status(isPublicError ? status : 500).json({
+    message: isPublicError ? error.message : 'KnightClub hit a server error.',
     requestId: req.id,
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getDashboard } from '../../api/dashboardApi';
-import { listGames } from '../../api/gamesApi';
+import { listGameHistory, listGames } from '../../api/gamesApi';
 import { getLeaderboard } from '../../api/leaderboardApi';
 import { listTournaments } from '../../api/tournamentsApi';
 import { listAnnouncements } from '../../api/announcementsApi';
@@ -9,6 +9,7 @@ import AdminPage from '../admin/AdminPage';
 import AnnouncementsPage from '../announcements/AnnouncementsPage';
 import DashboardPage from '../dashboard/DashboardPage';
 import GamePage from '../game/GamePage';
+import HistoryPage from '../history/HistoryPage';
 import LeaderboardPage from '../leaderboard/LeaderboardPage';
 import TournamentsPage from '../tournaments/TournamentsPage';
 import logo from '../../assets/images/logo.png';
@@ -22,15 +23,18 @@ export default function AppShell({ page, routes, session }) {
   const [workspace, setWorkspace] = useState({
     dashboard: {},
     games: [],
+    history: [],
     leaderboard: [],
     tournaments: [],
     announcements: [],
   });
+  const [toast, setToast] = useState(null);
 
   async function fetchWorkspace() {
-    const [dashboard, gameData, leaders, tourneys, posts] = await Promise.all([
+    const [dashboard, gameData, historyData, leaders, tourneys, posts] = await Promise.all([
       getDashboard(),
       listGames(),
+      listGameHistory(),
       getLeaderboard(),
       listTournaments(),
       listAnnouncements(),
@@ -38,6 +42,7 @@ export default function AppShell({ page, routes, session }) {
     return {
       dashboard,
       games: gameData.games,
+      history: historyData.games,
       leaderboard: leaders.players,
       tournaments: tourneys.tournaments,
       announcements: posts.announcements,
@@ -69,6 +74,16 @@ export default function AppShell({ page, routes, session }) {
     session.logout();
     navigate('/auth', { replace: true });
   }
+
+  function notify(message, type = 'info') {
+    setToast({ message, type, id: Date.now() });
+  }
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(null), 3600);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   function goToRoute(path) {
     navigate(path);
@@ -129,8 +144,15 @@ export default function AppShell({ page, routes, session }) {
           </div>
           <strong>{user.name}</strong>
         </header>
+        {toast && (
+          <div className={`${styles.toast} ${styles[toast.type] || ''}`} role="status">
+            <span>{toast.message}</span>
+            <button onClick={() => setToast(null)} type="button">Close</button>
+          </div>
+        )}
         {page === 'dashboard' && <DashboardPage user={user} workspace={workspace} />}
-        {page === 'game' && <GamePage user={user} games={workspace.games} refresh={refresh} />}
+        {page === 'game' && <GamePage user={user} games={workspace.games} refresh={refresh} notify={notify} />}
+        {page === 'history' && <HistoryPage games={workspace.history} />}
         {page === 'leaderboard' && <LeaderboardPage leaderboard={workspace.leaderboard} />}
         {page === 'tournaments' && <TournamentsPage tournaments={workspace.tournaments} />}
         {page === 'announcements' && <AnnouncementsPage announcements={workspace.announcements} />}

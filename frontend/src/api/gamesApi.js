@@ -4,6 +4,10 @@ export function listGames() {
   return apiRequest('/api/games');
 }
 
+export function listGameHistory() {
+  return apiRequest('/api/games/history');
+}
+
 export function getGame(id) {
   return apiRequest(`/api/games/${id}`);
 }

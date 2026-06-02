@@ -10,12 +10,35 @@ const router = express.Router();
 
 router.use(authenticate);
 
+async function currentPlayableGame(userId) {
+  const games = await query(
+    `SELECT id, status
+     FROM games
+     WHERE status IN ('open', 'active')
+       AND (white_player_id = ? OR black_player_id = ? OR created_by = ?)
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+    [userId, userId, userId],
+  );
+  return games[0] || null;
+}
+
+async function requireNoCurrentGame(userId) {
+  const game = await currentPlayableGame(userId);
+  if (game) {
+    const label = game.status === 'open' ? 'open' : 'active';
+    const error = new Error(`You already have an ${label} game. Finish or close game #${game.id} before starting another one.`);
+    error.status = 409;
+    throw error;
+  }
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const params = [];
-    let where = '';
+    let where = "WHERE g.status IN ('open', 'active')";
     if (req.user.role === 'player') {
-      where = 'WHERE g.white_player_id = ? OR g.black_player_id = ? OR g.status = "open"';
+      where += ' AND (g.white_player_id = ? OR g.black_player_id = ? OR g.status = "open")';
       params.push(req.user.id, req.user.id);
     }
 
@@ -37,8 +60,36 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+router.get('/history', async (req, res, next) => {
+  try {
+    const params = [];
+    let where = "WHERE g.status NOT IN ('open', 'active')";
+    if (req.user.role === 'player') {
+      where += ' AND (g.white_player_id = ? OR g.black_player_id = ? OR g.created_by = ?)';
+      params.push(req.user.id, req.user.id, req.user.id);
+    }
+
+    const games = await query(
+      `SELECT g.id, g.status, g.result, g.result_reason, g.white_player_id, g.black_player_id, g.created_by,
+              g.current_fen, g.created_at, g.completed_at,
+              white.name AS white_name, black.name AS black_name
+       FROM games g
+       LEFT JOIN users white ON white.id = g.white_player_id
+       LEFT JOIN users black ON black.id = g.black_player_id
+       ${where}
+       ORDER BY COALESCE(g.completed_at, g.updated_at, g.created_at) DESC
+       LIMIT 120`,
+      params,
+    );
+    res.json({ games: games.map((game) => ({ ...game, black_name: botName(game) || game.black_name })) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/', requireActive, async (req, res, next) => {
   try {
+    await requireNoCurrentGame(req.user.id);
     const result = await query(
       'INSERT INTO games (white_player_id, created_by, current_fen) VALUES (?, ?, ?)',
       [req.user.id, req.user.id, STARTING_FEN],
@@ -52,6 +103,7 @@ router.post('/', requireActive, async (req, res, next) => {
 
 router.post('/bot', requireActive, async (req, res, next) => {
   try {
+    await requireNoCurrentGame(req.user.id);
     const level = normalizeBotLevel(req.body.level);
     const result = await query(
       `INSERT INTO games (white_player_id, black_player_id, created_by, status, current_fen, result_reason)
@@ -67,6 +119,7 @@ router.post('/bot', requireActive, async (req, res, next) => {
 
 router.post('/:id/join', requireActive, async (req, res, next) => {
   try {
+    await requireNoCurrentGame(req.user.id);
     const games = await query('SELECT * FROM games WHERE id = ?', [req.params.id]);
     if (!games.length) return res.status(404).json({ message: 'Game not found.' });
     const game = games[0];
