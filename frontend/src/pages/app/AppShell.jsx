@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getDashboard } from '../../api/dashboardApi';
 import { listGameHistory, listGames } from '../../api/gamesApi';
@@ -75,9 +75,9 @@ export default function AppShell({ page, routes, session }) {
     navigate('/auth', { replace: true });
   }
 
-  function notify(message, type = 'info') {
+  const notify = useCallback((message, type = 'info') => {
     setToast({ message, type, id: Date.now() });
-  }
+  }, []);
 
   useEffect(() => {
     if (!toast) return undefined;

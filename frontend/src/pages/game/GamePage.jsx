@@ -45,7 +45,7 @@ function botLevelLabel(game) {
   return botLevelLabels[level] || 'Bot';
 }
 
-export default function GamePage({ user, games, refresh }) {
+export default function GamePage({ user, games, refresh, notify }) {
   const [selectedId, setSelectedId] = useState(games[0]?.id || '');
   const [game, setGame] = useState(null);
   const [message, setMessage] = useState('');
@@ -91,7 +91,12 @@ export default function GamePage({ user, games, refresh }) {
       if (response?.game) setGame(response.game);
     });
     socket.on('game:updated', ({ game: updated, pendingBotMove }) => {
-      setGame(updated);
+      setGame((current) => {
+        if (current?.status !== 'completed' && updated?.status === 'completed') {
+          notify?.('Game completed and moved to history.', 'success');
+        }
+        return updated;
+      });
       setIsBotThinking(Boolean(pendingBotMove));
       refresh();
     });
@@ -103,25 +108,45 @@ export default function GamePage({ user, games, refresh }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [refresh, selectedId]);
+  }, [notify, refresh, selectedId]);
 
   async function handleCreateGame() {
-    const data = await createGame();
-    setSelectedId(data.id);
-    refresh();
+    try {
+      const data = await createGame();
+      setSelectedId(data.id);
+      setMessage('Game created.');
+      notify?.('Game created.', 'success');
+      refresh();
+    } catch (error) {
+      setMessage(error.message);
+      notify?.(error.message, 'error');
+    }
   }
 
   async function handleCreateBotGame() {
-    const data = await createBotGame(botLevel);
-    setSelectedId(data.id);
-    setMessage(`Bot game started at ${botLevel} level.`);
-    refresh();
+    try {
+      const data = await createBotGame(botLevel);
+      setSelectedId(data.id);
+      setMessage(`Bot game started at ${botLevel} level.`);
+      notify?.(`Bot game started at ${botLevel} level.`, 'success');
+      refresh();
+    } catch (error) {
+      setMessage(error.message);
+      notify?.(error.message, 'error');
+    }
   }
 
   async function handleJoinGame(id) {
-    await joinGame(id);
-    setSelectedId(id);
-    refresh();
+    try {
+      await joinGame(id);
+      setSelectedId(id);
+      setMessage('Game joined.');
+      notify?.('Game joined.', 'success');
+      refresh();
+    } catch (error) {
+      setMessage(error.message);
+      notify?.(error.message, 'error');
+    }
   }
 
   async function handleCloseGame() {
@@ -130,28 +155,46 @@ export default function GamePage({ user, games, refresh }) {
   }
 
   async function handleCloseOpenGame(id) {
-    await closeGame(id);
-    setMessage('Game closed.');
-    if (String(id) === String(game?.id)) {
-      setGame({ ...game, status: 'cancelled', result: 'abandoned', result_reason: 'closed_by_creator' });
+    try {
+      await closeGame(id);
+      setMessage('Game closed.');
+      notify?.('Game closed.', 'success');
+      if (String(id) === String(game?.id)) {
+        setGame({ ...game, status: 'cancelled', result: 'abandoned', result_reason: 'closed_by_creator' });
+      }
+      refresh();
+    } catch (error) {
+      setMessage(error.message);
+      notify?.(error.message, 'error');
     }
-    refresh();
   }
 
   async function handleResignGame() {
     if (!game) return;
-    const data = await resignGame(game.id);
-    setMessage('You resigned the game.');
-    if (data.game) setGame(data.game);
-    refresh();
+    try {
+      const data = await resignGame(game.id);
+      setMessage('You resigned the game.');
+      notify?.('Game completed by resignation.', 'success');
+      if (data.game) setGame(data.game);
+      refresh();
+    } catch (error) {
+      setMessage(error.message);
+      notify?.(error.message, 'error');
+    }
   }
 
   async function handleAbortBotGame() {
     if (!game) return;
-    await abortBotGame(game.id);
-    setMessage('Bot game aborted.');
-    setGame({ ...game, status: 'cancelled', result: 'abandoned', result_reason: 'bot_aborted' });
-    refresh();
+    try {
+      await abortBotGame(game.id);
+      setMessage('Bot game aborted.');
+      notify?.('Bot game aborted.', 'success');
+      setGame({ ...game, status: 'cancelled', result: 'abandoned', result_reason: 'bot_aborted' });
+      refresh();
+    } catch (error) {
+      setMessage(error.message);
+      notify?.(error.message, 'error');
+    }
   }
 
   function handleBoardMove(move) {
@@ -159,7 +202,10 @@ export default function GamePage({ user, games, refresh }) {
     setIsBotThinking(isBotGame);
     socketRef.current?.emit('game:move', { gameId: selectedId, ...move }, (response) => {
       setMessage(response.ok ? 'Move saved.' : response.message);
-      if (!response.ok) setIsBotThinking(false);
+      if (!response.ok) {
+        setIsBotThinking(false);
+        notify?.(response.message || 'Move failed.', 'error');
+      }
       if (response.game) setGame(response.game);
     });
   }
@@ -171,8 +217,10 @@ export default function GamePage({ user, games, refresh }) {
     try {
       const data = await analyzeGame(game.id);
       setAnalysis(data.analysis || []);
+      notify?.('Analysis complete.', 'success');
     } catch (error) {
       setMessage(error.message);
+      notify?.(error.message, 'error');
     } finally {
       setIsAnalyzing(false);
     }
