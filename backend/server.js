@@ -15,6 +15,14 @@ const announcementRoutes = require('./routes/announcements.route');
 const leaderboardRoutes = require('./routes/leaderboard.route');
 const dashboardRoutes = require('./routes/dashboard.route');
 const { wireGameSockets } = require('./socket/games');
+const {
+  errorLogPath,
+  installProcessErrorHandlers,
+  logError,
+  requestContext,
+} = require('./lib/errorLogger');
+
+installProcessErrorHandlers();
 
 const app = express();
 const server = http.createServer(app);
@@ -31,6 +39,11 @@ const io = new Server(server, {
 
 app.use(helmet());
 app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use((req, res, next) => {
+  req.id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  res.setHeader('X-Request-Id', req.id);
+  next();
+});
 app.use(express.json());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
@@ -51,12 +64,20 @@ app.use((req, res) => {
   res.status(404).json({ message: `No route for ${req.method} ${req.path}` });
 });
 
-app.use((error, _req, res, _next) => {
-  console.error(error);
-  res.status(500).json({ message: 'KnightClub hit a server error.' });
+app.use((error, req, res, _next) => {
+  logError(error, requestContext(req));
+  res.status(500).json({
+    message: 'KnightClub hit a server error.',
+    requestId: req.id,
+  });
 });
 
 const port = Number(process.env.PORT || 4000);
+server.on('error', (error) => {
+  logError(error, { source: 'server.listen', port });
+});
+
 server.listen(port, () => {
   console.log(`KnightClub API listening on ${port}`);
+  console.log(`KnightClub error log: ${errorLogPath}`);
 });
