@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getDashboard } from '../../api/dashboardApi';
 import { listGameHistory, listGames } from '../../api/gamesApi';
@@ -12,6 +12,7 @@ import GamePage from '../game/GamePage';
 import HistoryPage from '../history/HistoryPage';
 import LeaderboardPage from '../leaderboard/LeaderboardPage';
 import TournamentsPage from '../tournaments/TournamentsPage';
+import { useToast } from '../../components/ToastProvider';
 import logo from '../../assets/images/logo.png';
 import styles from './AppShell.module.css';
 
@@ -28,7 +29,7 @@ export default function AppShell({ page, routes, session }) {
     tournaments: [],
     announcements: [],
   });
-  const [toast, setToast] = useState(null);
+  const { notify } = useToast();
 
   async function fetchWorkspace() {
     const [dashboard, gameData, historyData, leaders, tourneys, posts] = await Promise.all([
@@ -74,16 +75,6 @@ export default function AppShell({ page, routes, session }) {
     session.logout();
     navigate('/auth', { replace: true });
   }
-
-  const notify = useCallback((message, type = 'info') => {
-    setToast({ message, type, id: Date.now() });
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(null), 3600);
-    return () => clearTimeout(timer);
-  }, [toast]);
 
   function goToRoute(path) {
     navigate(path);
@@ -144,12 +135,6 @@ export default function AppShell({ page, routes, session }) {
           </div>
           <strong>{user.name}</strong>
         </header>
-        {toast && (
-          <div className={`${styles.toast} ${styles[toast.type] || ''}`} role="status">
-            <span>{toast.message}</span>
-            <button onClick={() => setToast(null)} type="button">Close</button>
-          </div>
-        )}
         {page === 'dashboard' && <DashboardPage user={user} workspace={workspace} />}
         {page === 'game' && <GamePage user={user} games={workspace.games} refresh={refresh} notify={notify} />}
         {page === 'history' && <HistoryPage games={workspace.history} />}
