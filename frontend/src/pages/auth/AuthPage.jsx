@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { login, register } from '../../api/authApi';
 import { setAuthToken } from '../../api/client';
+import logo from '../../assets/images/logo.png';
 import styles from './AuthPage.module.css';
 
 export default function AuthPage({ onAuthed }) {
@@ -23,9 +24,7 @@ export default function AuthPage({ onAuthed }) {
   return (
     <main className={styles.shell}>
       <section className={styles.brandPanel}>
-        <div className={styles.boardMark} aria-hidden="true">
-          {Array.from({ length: 16 }).map((_, index) => <span key={index} />)}
-        </div>
+        <img className={styles.logo} src={logo} alt="" />
         <h1>KnightClub</h1>
         <p>School chess club games, tournaments, approvals, and leaderboards in one focused workspace.</p>
       </section>

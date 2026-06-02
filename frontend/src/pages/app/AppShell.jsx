@@ -11,6 +11,7 @@ import DashboardPage from '../dashboard/DashboardPage';
 import GamePage from '../game/GamePage';
 import LeaderboardPage from '../leaderboard/LeaderboardPage';
 import TournamentsPage from '../tournaments/TournamentsPage';
+import logo from '../../assets/images/logo.png';
 import styles from './AppShell.module.css';
 
 export default function AppShell({ page, routes, session }) {
@@ -67,7 +68,10 @@ export default function AppShell({ page, routes, session }) {
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
-        <div className={styles.clubTitle}>KnightClub<span>{user.role.replace('_', ' ')}</span></div>
+        <div className={styles.clubTitle}>
+          <img src={logo} alt="" />
+          <div>KnightClub<span>{user.role.replace('_', ' ')}</span></div>
+        </div>
         {availableRoutes.map((route) => (
           <button className={activeRoute.path === route.path ? styles.active : ''} onClick={() => navigate(route.path)} key={route.path} type="button">
             {route.label}

@@ -16,8 +16,18 @@
 
 .clubTitle {
   margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 26px;
   font-weight: 950;
+}
+
+.clubTitle img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .clubTitle span {

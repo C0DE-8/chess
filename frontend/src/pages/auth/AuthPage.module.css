@@ -30,23 +30,11 @@
   color: #efe5d2;
 }
 
-.boardMark {
-  width: 128px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.boardMark span {
-  aspect-ratio: 1;
-}
-
-.boardMark span:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.82);
-}
-
-.boardMark span:nth-child(even) {
-  background: rgba(33, 79, 72, 0.88);
+.logo {
+  width: 132px;
+  height: 132px;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.28));
 }
 
 .authPanel {
