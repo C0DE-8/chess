@@ -1,6 +1,7 @@
 const { Chess } = require('chess.js');
 const { query } = require('../config/database');
 const { bestMove } = require('./stockfish');
+const { getStockfishEnabled } = require('./settings');
 
 const BOT_LEVELS = ['newbie', 'beginner', 'novice', 'intermediate', 'advanced'];
 const BOT_LEVEL_LABELS = {
@@ -52,6 +53,9 @@ async function chooseBotMove(chess, level) {
 
 async function chooseStockfishMove(chess, level, moves) {
   try {
+    const stockfishEnabled = await getStockfishEnabled();
+    if (!stockfishEnabled) return null;
+
     const uciMove = await bestMove(chess.fen(), level);
     if (!uciMove) return null;
 

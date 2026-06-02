@@ -1,13 +1,25 @@
-import { useState } from 'react';
-import { createAdmin, updateUserStatus } from '../../api/adminApi';
+import { useEffect, useState } from 'react';
+import { createAdmin, getAdminSettings, updateStockfishSetting, updateUserStatus } from '../../api/adminApi';
 import { createAnnouncement } from '../../api/announcementsApi';
 import { createTournament } from '../../api/tournamentsApi';
+import { useToast } from '../../components/ToastProvider';
 import styles from './AdminPage.module.css';
 
 export default function AdminPage({ user, dashboard, refresh }) {
   const [announcement, setAnnouncement] = useState({ title: '', body: '' });
   const [tournament, setTournament] = useState({ name: '', description: '', status: 'open' });
   const [admin, setAdmin] = useState({ name: '', email: '', password: '' });
+  const [settings, setSettings] = useState(dashboard.settings || null);
+  const [isSavingStockfish, setIsSavingStockfish] = useState(false);
+  const { notify } = useToast();
+
+  useEffect(() => {
+    setSettings(dashboard.settings || null);
+  }, [dashboard.settings]);
+
+  useEffect(() => {
+    getAdminSettings().then((data) => setSettings(data.settings)).catch(() => {});
+  }, []);
 
   async function approve(id) {
     await updateUserStatus(id, 'active');
@@ -40,10 +52,43 @@ export default function AdminPage({ user, dashboard, refresh }) {
     refresh();
   }
 
+  async function toggleStockfish() {
+    const nextEnabled = !settings?.stockfish?.enabled;
+    setIsSavingStockfish(true);
+    try {
+      const data = await updateStockfishSetting(nextEnabled);
+      setSettings(data.settings);
+      notify(data.message, 'success');
+      refresh();
+    } catch (error) {
+      notify(error.message, 'error');
+    } finally {
+      setIsSavingStockfish(false);
+    }
+  }
+
   return (
     <section className={styles.workspace}>
       <h2>Club control</h2>
       <div className={styles.adminGrid}>
+        <div className={styles.settingPanel}>
+          <div>
+            <h3>Bot engine</h3>
+            <p>
+              {settings?.stockfish?.enabled ? 'Stockfish is on. Bot moves use Stockfish when available.' : 'Stockfish is off. Bot moves use the chess.js fallback.'}
+            </p>
+            {!settings?.stockfish?.configured && <small>Stockfish path is not configured on the server.</small>}
+          </div>
+          <button
+            className={settings?.stockfish?.enabled ? styles.toggleOn : styles.toggleOff}
+            onClick={toggleStockfish}
+            disabled={isSavingStockfish}
+            type="button"
+          >
+            <span />
+            {settings?.stockfish?.enabled ? 'On' : 'Off'}
+          </button>
+        </div>
         <div>
           <h3>Pending players</h3>
           {(dashboard.pendingPlayers || []).map((player) => (

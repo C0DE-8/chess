@@ -4,6 +4,7 @@ const { authenticate, requireActive, requireAdmin } = require('../middleware/aut
 const { STARTING_FEN, completeGame, getGameWithMoves } = require('../lib/game');
 const { BOT_LEVELS, botName, isBotGame, normalizeBotLevel } = require('../lib/bot');
 const { evaluateFen, stockfishAvailable } = require('../lib/stockfish');
+const { getStockfishEnabled } = require('../lib/settings');
 const { logActivity } = require('../lib/activity');
 
 const router = express.Router();
@@ -237,8 +238,11 @@ router.get('/:id/analyze', async (req, res, next) => {
       return res.status(403).json({ message: 'You can only analyze your own games.' });
     }
 
-    if (!stockfishAvailable()) {
-      return res.status(503).json({ message: 'Stockfish is not configured on this server.' });
+    const stockfishEnabled = await getStockfishEnabled();
+    if (!stockfishEnabled || !stockfishAvailable()) {
+      return res.status(503).json({
+        message: stockfishEnabled ? 'Stockfish is not configured on this server.' : 'Stockfish is turned off by an admin.',
+      });
     }
 
     const depth = Math.min(Math.max(Number(req.query.depth) || 8, 1), 14);

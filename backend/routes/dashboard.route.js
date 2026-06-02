@@ -1,6 +1,7 @@
 const express = require('express');
 const { query } = require('../config/database');
 const { authenticate } = require('../middleware/auth');
+const { getAppSettings } = require('../lib/settings');
 
 const router = express.Router();
 
@@ -67,7 +68,8 @@ router.get('/', authenticate, async (req, res, next) => {
        FROM users`,
     );
 
-    res.json({ user: req.user, announcements, leaderboard, pendingPlayers, activeGames, tournaments, activity, counts: counts[0] });
+    const settings = await getAppSettings();
+    res.json({ user: req.user, announcements, leaderboard, pendingPlayers, activeGames, tournaments, activity, counts: counts[0], settings });
   } catch (error) {
     next(error);
   }

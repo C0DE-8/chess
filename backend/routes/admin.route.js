@@ -3,11 +3,33 @@ const bcrypt = require('bcryptjs');
 const { query } = require('../config/database');
 const { authenticate, requireAdmin, requireRole } = require('../middleware/auth');
 const { logActivity } = require('../lib/activity');
+const { getAppSettings, setStockfishEnabled } = require('../lib/settings');
 
 const router = express.Router();
 
 router.use(authenticate);
 router.use(requireAdmin);
+
+router.get('/settings', async (_req, res, next) => {
+  try {
+    const settings = await getAppSettings();
+    res.json({ settings });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/settings/stockfish', async (req, res, next) => {
+  try {
+    const enabled = Boolean(req.body.enabled);
+    const stockfishEnabled = await setStockfishEnabled(enabled);
+    await logActivity(req.user.id, 'stockfish_setting_updated', 'setting', null, { enabled: stockfishEnabled });
+    const settings = await getAppSettings();
+    res.json({ settings, message: `Stockfish ${stockfishEnabled ? 'enabled' : 'disabled'}.` });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get('/users', async (req, res, next) => {
   try {

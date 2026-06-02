@@ -14,6 +14,17 @@ export function createAdmin(payload) {
   });
 }
 
+export function getAdminSettings() {
+  return apiRequest('/api/admin/settings');
+}
+
+export function updateStockfishSetting(enabled) {
+  return apiRequest('/api/admin/settings/stockfish', {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 export function updateUserRole(id, role) {
   return apiRequest(`/api/admin/users/${id}/role`, {
     method: 'PATCH',

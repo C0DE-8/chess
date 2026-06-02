@@ -275,7 +275,7 @@ export default function GamePage({ user, games, refresh }) {
             {game ? `${userColor || 'Spectator'} view. ${isPlayable ? 'Your move: click a piece.' : `Waiting for ${turnColor(game.current_fen)}.`}` : 'Choose an open game.'}
           </p>
           {message && <p className={styles.notice}>{message}</p>}
-          {isBotThinking && <p className={styles.thinking}>Stockfish is thinking...</p>}
+          {isBotThinking && <p className={styles.thinking}>Bot is thinking...</p>}
 
           <div className={styles.botPanel}>
             <label>

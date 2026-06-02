@@ -1,59 +1,99 @@
 .stack {
   position: fixed;
   right: 22px;
-  top: 22px;
+  top: 24px;
   z-index: 60;
-  width: min(380px, calc(100vw - 32px));
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(420px, calc(100vh - 48px));
   display: grid;
+  align-content: start;
   gap: 10px;
+  overflow: hidden;
   pointer-events: none;
 }
 
 .toast {
-  padding: 12px;
-  display: flex;
+  min-height: 58px;
+  max-height: 88px;
+  padding: 12px 12px 12px 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  border-radius: 7px;
-  background: #183d3a;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-left: 4px solid rgba(190, 227, 138, 0.9);
+  border-radius: 8px;
+  background: rgba(24, 61, 58, 0.72);
   color: #fffaf1;
-  box-shadow: 0 16px 34px rgba(26, 31, 27, 0.22);
+  box-shadow: 0 16px 34px rgba(26, 31, 27, 0.2);
+  backdrop-filter: blur(16px) saturate(135%);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
   pointer-events: auto;
 }
 
 .toast span {
   min-width: 0;
+  display: -webkit-box;
+  max-height: 42px;
+  overflow: hidden;
   font-weight: 850;
+  line-height: 1.25;
   overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .toast button {
   border: 0;
   border-radius: 6px;
-  padding: 7px 9px;
-  background: rgba(255, 255, 255, 0.16);
+  padding: 7px 8px;
+  background: rgba(255, 255, 255, 0.18);
   color: inherit;
+  font-size: 12px;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .success {
-  background: #2f6336;
+  border-left-color: rgba(160, 220, 111, 0.95);
+  background: rgba(47, 99, 54, 0.72);
 }
 
 .error {
-  background: #843b33;
+  border-left-color: rgba(255, 157, 136, 0.95);
+  background: rgba(132, 59, 51, 0.78);
 }
 
 .warning {
-  background: #72571f;
+  border-left-color: rgba(246, 204, 105, 0.95);
+  background: rgba(114, 87, 31, 0.78);
 }
 
 @media (max-width: 1024px) {
   .stack {
     top: 78px;
     right: 12px;
-    left: 12px;
-    width: auto;
+    left: auto;
+    width: min(340px, calc(100vw - 24px));
+    max-height: min(320px, calc(100vh - 96px));
+  }
+}
+
+@media (max-width: 480px) {
+  .stack {
+    top: 76px;
+    right: 10px;
+    width: min(310px, calc(100vw - 20px));
+  }
+
+  .toast {
+    min-height: 54px;
+    max-height: 78px;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .toast span {
+    font-size: 13px;
   }
 }
