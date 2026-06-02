@@ -241,6 +241,9 @@ export default function GamePage({ user, games, refresh }) {
               <strong>{playerName(game, topColor)}</strong>
               <small>{topColor} {playerId(game, topColor) === user.id ? 'you' : isBotGame && topColor === 'black' ? botLevelLabel(game) : ''}</small>
             </div>
+            {isBotThinking && isBotGame && topColor === 'black' && (
+              <span className={styles.thinkingBubble}>Bot is thinking</span>
+            )}
           </div>
 
           <ChessBoard
@@ -258,6 +261,9 @@ export default function GamePage({ user, games, refresh }) {
               <strong>{playerName(game, bottomColor)}</strong>
               <small>{bottomColor} {playerId(game, bottomColor) === user.id ? 'you' : isBotGame && bottomColor === 'black' ? botLevelLabel(game) : ''}</small>
             </div>
+            {isBotThinking && isBotGame && bottomColor === 'black' && (
+              <span className={styles.thinkingBubble}>Bot is thinking</span>
+            )}
           </div>
         </div>
 
@@ -275,7 +281,6 @@ export default function GamePage({ user, games, refresh }) {
             {game ? `${userColor || 'Spectator'} view. ${isPlayable ? 'Your move: click a piece.' : `Waiting for ${turnColor(game.current_fen)}.`}` : 'Choose an open game.'}
           </p>
           {message && <p className={styles.notice}>{message}</p>}
-          {isBotThinking && <p className={styles.thinking}>Bot is thinking...</p>}
 
           <div className={styles.botPanel}>
             <label>

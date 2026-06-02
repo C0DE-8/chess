@@ -21,6 +21,7 @@
 }
 
 .playerBar {
+  position: relative;
   width: min(100%, 672px);
   min-height: 48px;
   display: flex;
@@ -49,6 +50,50 @@
   display: block;
   color: #aaa69b;
   text-transform: capitalize;
+}
+
+.thinkingBubble {
+  margin-left: auto;
+  max-width: min(220px, 46%);
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(31, 30, 27, 0.58);
+  color: #f6ffd8;
+  box-shadow: 0 10px 24px rgba(12, 13, 10, 0.24);
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thinkingBubble::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  display: inline-block;
+  border-radius: 999px;
+  background: #bfe18c;
+  box-shadow: 10px 0 0 rgba(191, 225, 140, 0.62), 20px 0 0 rgba(191, 225, 140, 0.34);
+  animation: pulseDots 1s ease-in-out infinite;
+}
+
+@keyframes pulseDots {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
 }
 
 .sidePanel {
@@ -116,15 +161,6 @@
   border-radius: 7px;
   background: #38362f;
   color: #e7dcc6;
-}
-
-.thinking {
-  margin: 0 14px;
-  padding: 10px 12px;
-  border-radius: 7px;
-  background: rgba(129, 182, 76, 0.14);
-  color: #d9f5b8;
-  font-weight: 900;
 }
 
 .gameList {
@@ -355,7 +391,6 @@
   .actionPanel,
   .analysisPanel,
   .notice,
-  .thinking,
   .turnText {
     margin-inline: 10px;
   }
@@ -368,5 +403,11 @@
     width: 32px;
     height: 32px;
     font-size: 20px;
+  }
+
+  .thinkingBubble {
+    max-width: 44%;
+    padding: 7px 9px;
+    font-size: 11px;
   }
 }
