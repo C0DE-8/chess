@@ -1,0 +1,26 @@
+.panel {
+  padding: 18px;
+  border: 1px solid #ded2c0;
+  border-radius: 8px;
+  background: #fffaf1;
+  box-shadow: 0 10px 26px rgba(44, 35, 24, 0.07);
+  overflow-x: auto;
+}
+
+.panel table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.panel th,
+.panel td {
+  padding: 12px;
+  border-bottom: 1px solid #eadfce;
+  text-align: left;
+}
+
+.panel th {
+  color: #59655f;
+  text-transform: uppercase;
+  font-size: 12px;
+}

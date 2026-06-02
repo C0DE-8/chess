@@ -1,0 +1,67 @@
+.workspace {
+  padding: 18px;
+  border: 1px solid #ded2c0;
+  border-radius: 8px;
+  background: #fffaf1;
+  box-shadow: 0 10px 26px rgba(44, 35, 24, 0.07);
+}
+
+.workspace h2,
+.workspace h3 {
+  margin: 0 0 14px;
+  color: #201b16;
+}
+
+.adminGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.adminRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #eadfce;
+}
+
+.adminRow span {
+  display: grid;
+}
+
+.adminRow small {
+  color: #756b5f;
+}
+
+.adminRow button,
+.adminGrid form button {
+  border: 0;
+  border-radius: 7px;
+  padding: 12px 14px;
+  background: #1f5f57;
+  color: #fffdf7;
+  font-weight: 900;
+}
+
+.adminGrid form {
+  display: grid;
+  gap: 16px;
+}
+
+.adminGrid input,
+.adminGrid select {
+  width: 100%;
+  border: 1px solid #d8ccba;
+  border-radius: 7px;
+  padding: 12px 13px;
+  background: #fffdfa;
+  color: #201b16;
+}
+
+@media (max-width: 900px) {
+  .adminGrid {
+    grid-template-columns: 1fr;
+  }
+}

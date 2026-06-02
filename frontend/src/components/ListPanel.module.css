@@ -1,0 +1,22 @@
+.panel {
+  padding: 18px;
+  border: 1px solid #ded2c0;
+  border-radius: 8px;
+  background: #fffaf1;
+  box-shadow: 0 10px 26px rgba(44, 35, 24, 0.07);
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  color: #201b16;
+}
+
+.panel p {
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid #eadfce;
+}
+
+.muted {
+  color: #756b5f;
+}

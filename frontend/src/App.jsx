@@ -1,0 +1,51 @@
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+import { useSession } from './auth/useSession';
+import AdminRoute from './routes/AdminRoute';
+import AuthRoute from './routes/AuthRoute';
+import UserRoute from './routes/UserRoute';
+import AppShell from './pages/app/AppShell';
+
+const routes = [
+  { path: '/auth', label: 'Auth', publicOnly: true },
+  { path: '/dashboard', label: 'Dashboard' },
+  { path: '/game', label: 'Game' },
+  { path: '/leaderboard', label: 'Leaderboard' },
+  { path: '/tournaments', label: 'Tournaments' },
+  { path: '/announcements', label: 'Announcements' },
+  { path: '/admin', label: 'Admin', adminOnly: true },
+];
+
+function App() {
+  const session = useSession();
+
+  return (
+    <Router>
+      <Routes>
+        {/* ================= AUTH ROUTES ================= */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/auth" element={<AuthRoute session={session} />} />
+        <Route path="/login" element={<Navigate to="/auth" replace />} />
+        <Route path="/register" element={<Navigate to="/auth" replace />} />
+
+        {/* ================= PLAYER ROUTES (Protected) ================= */}
+        <Route element={<UserRoute session={session} />}>
+          <Route path="/dashboard" element={<AppShell page="dashboard" routes={routes} session={session} />} />
+          <Route path="/game" element={<AppShell page="game" routes={routes} session={session} />} />
+          <Route path="/leaderboard" element={<AppShell page="leaderboard" routes={routes} session={session} />} />
+          <Route path="/tournaments" element={<AppShell page="tournaments" routes={routes} session={session} />} />
+          <Route path="/announcements" element={<AppShell page="announcements" routes={routes} session={session} />} />
+        </Route>
+
+        {/* ================= ADMIN ROUTES (Protected) ================= */}
+        <Route element={<AdminRoute session={session} />}>
+          <Route path="/admin" element={<AppShell page="admin" routes={routes} session={session} />} />
+        </Route>
+
+        {/* ================= 404 FALLBACK ================= */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;

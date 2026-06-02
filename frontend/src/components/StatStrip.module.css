@@ -1,0 +1,32 @@
+.statStrip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.statStrip div {
+  padding: 16px;
+  border: 1px solid #ded2c0;
+  border-radius: 8px;
+  background: #fffaf1;
+  box-shadow: 0 10px 26px rgba(44, 35, 24, 0.07);
+}
+
+.statStrip span {
+  display: block;
+  color: #6d6356;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.statStrip strong {
+  font-size: 30px;
+  color: #1f5f57;
+}
+
+@media (max-width: 900px) {
+  .statStrip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
