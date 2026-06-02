@@ -93,9 +93,26 @@
   border: 0;
   border-radius: 7px;
   padding: 12px 14px;
+  min-height: 45px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
   background: #1f5f57;
   color: #fffdf7;
   font-weight: 900;
+}
+
+.primary:disabled {
+  cursor: wait;
+  opacity: 0.82;
+}
+
+.buttonLoader {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  animation: spin 0.9s linear infinite;
 }
 
 .error {
@@ -104,6 +121,12 @@
   border-radius: 7px;
   background: #ffe3dd;
   color: #8d2f1d;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 900px) {
