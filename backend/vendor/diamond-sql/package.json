@@ -1,0 +1,9 @@
+{
+  "name": "diamond-sql",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "peerDependencies": {
+    "mysql2": "^3.0.0"
+  }
+}
