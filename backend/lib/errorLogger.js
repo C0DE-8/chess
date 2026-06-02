@@ -3,6 +3,8 @@ const path = require('path');
 
 const defaultLogPath = path.join(__dirname, '..', 'logs', 'error.log');
 const errorLogPath = resolveLogPath(process.env.ERROR_LOG_PATH);
+const recentErrors = [];
+const maxRecentErrors = Number(process.env.ERROR_LOG_MEMORY_LIMIT || 100);
 
 function logError(error, context = {}) {
   const entry = {
@@ -15,6 +17,7 @@ function logError(error, context = {}) {
     context: redact(context),
   };
 
+  rememberError(entry);
   const line = `${JSON.stringify(entry)}\n`;
 
   try {
@@ -43,6 +46,32 @@ function requestContext(req) {
   };
 }
 
+function getRecentErrors(limit = 50) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), maxRecentErrors);
+  return recentErrors.slice(-safeLimit).reverse();
+}
+
+function readErrorLogFile(limit = 50) {
+  try {
+    const contents = fs.readFileSync(errorLogPath, 'utf8');
+    return contents
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .slice(-limit)
+      .reverse()
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch (_) {
+          return { raw: line };
+        }
+      });
+  } catch (error) {
+    return [];
+  }
+}
+
 function installProcessErrorHandlers() {
   process.on('unhandledRejection', (reason) => {
     logError(reason instanceof Error ? reason : new Error(String(reason)), {
@@ -54,6 +83,13 @@ function installProcessErrorHandlers() {
     logError(error, { source: 'process.uncaughtException' });
     process.exitCode = 1;
   });
+}
+
+function rememberError(entry) {
+  recentErrors.push(entry);
+  if (recentErrors.length > maxRecentErrors) {
+    recentErrors.splice(0, recentErrors.length - maxRecentErrors);
+  }
 }
 
 function redact(value) {
@@ -80,7 +116,9 @@ function resolveLogPath(configuredPath) {
 
 module.exports = {
   errorLogPath,
+  getRecentErrors,
   installProcessErrorHandlers,
   logError,
+  readErrorLogFile,
   requestContext,
 };

@@ -17,8 +17,10 @@ const dashboardRoutes = require('./routes/dashboard.route');
 const { wireGameSockets } = require('./socket/games');
 const {
   errorLogPath,
+  getRecentErrors,
   installProcessErrorHandlers,
   logError,
+  readErrorLogFile,
   requestContext,
 } = require('./lib/errorLogger');
 
@@ -49,6 +51,24 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.get('/', (_req, res) => res.json({ ok: true, app: 'KnightClub' }));
 app.get('/health', (_req, res) => res.json({ ok: true, app: 'KnightClub' }));
+app.get('/debug/errors', (req, res) => {
+  const logToken = process.env.ERROR_LOG_TOKEN;
+  const providedToken = req.headers['x-error-log-token'] || req.query.token;
+
+  if (!logToken || providedToken !== logToken) {
+    return res.status(401).json({ message: 'Missing or invalid error log token.' });
+  }
+
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+
+  return res.json({
+    ok: true,
+    source: 'server',
+    logPath: errorLogPath,
+    recent: getRecentErrors(limit),
+    file: readErrorLogFile(limit),
+  });
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
