@@ -4,6 +4,7 @@ import AdminRoute from './routes/AdminRoute';
 import AuthRoute from './routes/AuthRoute';
 import UserRoute from './routes/UserRoute';
 import AppShell from './pages/app/AppShell';
+import NotFoundPage from './pages/not-found/NotFoundPage';
 
 const routes = [
   { path: '/auth', label: 'Auth', publicOnly: true },
@@ -44,7 +45,7 @@ function App() {
         </Route>
 
         {/* ================= 404 FALLBACK ================= */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<NotFoundPage session={session} />} />
       </Routes>
     </Router>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getDashboard } from '../../api/dashboardApi';
 import { listGameHistory, listGames } from '../../api/gamesApi';
@@ -12,7 +12,6 @@ import GamePage from '../game/GamePage';
 import HistoryPage from '../history/HistoryPage';
 import LeaderboardPage from '../leaderboard/LeaderboardPage';
 import TournamentsPage from '../tournaments/TournamentsPage';
-import { useToast } from '../../components/ToastProvider';
 import logo from '../../assets/images/logo.png';
 import styles from './AppShell.module.css';
 
@@ -29,9 +28,8 @@ export default function AppShell({ page, routes, session }) {
     tournaments: [],
     announcements: [],
   });
-  const { notify } = useToast();
 
-  async function fetchWorkspace() {
+  const fetchWorkspace = useCallback(async () => {
     const [dashboard, gameData, historyData, leaders, tourneys, posts] = await Promise.all([
       getDashboard(),
       listGames(),
@@ -48,21 +46,21 @@ export default function AppShell({ page, routes, session }) {
       tournaments: tourneys.tournaments,
       announcements: posts.announcements,
     };
-  }
+  }, []);
 
   function applyWorkspace(data) {
     setUser(data.dashboard.user);
     setWorkspace(data);
   }
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const data = await fetchWorkspace();
     applyWorkspace(data);
-  }
+  }, [fetchWorkspace]);
 
   useEffect(() => {
     fetchWorkspace().then(applyWorkspace).catch(() => {});
-  }, []);
+  }, [fetchWorkspace]);
 
   useEffect(() => {
     setIsMobileNavOpen(false);
@@ -136,7 +134,7 @@ export default function AppShell({ page, routes, session }) {
           <strong>{user.name}</strong>
         </header>
         {page === 'dashboard' && <DashboardPage user={user} workspace={workspace} />}
-        {page === 'game' && <GamePage user={user} games={workspace.games} refresh={refresh} notify={notify} />}
+        {page === 'game' && <GamePage user={user} games={workspace.games} refresh={refresh} />}
         {page === 'history' && <HistoryPage games={workspace.history} />}
         {page === 'leaderboard' && <LeaderboardPage leaderboard={workspace.leaderboard} />}
         {page === 'tournaments' && <TournamentsPage tournaments={workspace.tournaments} />}

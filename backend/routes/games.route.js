@@ -10,31 +10,51 @@ const router = express.Router();
 
 router.use(authenticate);
 
-async function currentPlayableGame(userId) {
+async function currentOpenGame(userId) {
   const games = await query(
     `SELECT id, status
      FROM games
-     WHERE status IN ('open', 'active')
-       AND (white_player_id = ? OR black_player_id = ? OR created_by = ?)
+     WHERE status = 'open'
+       AND created_by = ?
      ORDER BY updated_at DESC
      LIMIT 1`,
-    [userId, userId, userId],
+    [userId],
   );
   return games[0] || null;
 }
 
-async function requireNoCurrentGame(userId) {
-  const game = await currentPlayableGame(userId);
+async function requireNoOpenGame(userId) {
+  const game = await currentOpenGame(userId);
   if (game) {
-    const label = game.status === 'open' ? 'open' : 'active';
-    const error = new Error(`You already have an ${label} game. Finish or close game #${game.id} before starting another one.`);
+    const error = new Error(`You already have open game #${game.id}. Close it or wait for another player before opening a new game.`);
     error.status = 409;
     throw error;
   }
 }
 
+async function closeDuplicateOpenGames() {
+  await query(
+    `UPDATE games g
+     JOIN (
+       SELECT created_by, MAX(id) AS keep_id
+       FROM games
+       WHERE status = 'open' AND black_player_id IS NULL
+       GROUP BY created_by
+       HAVING COUNT(*) > 1
+     ) keepers ON keepers.created_by = g.created_by
+     SET g.status = 'cancelled',
+         g.result = 'abandoned',
+         g.result_reason = 'duplicate_open_auto_closed',
+         g.completed_at = COALESCE(g.completed_at, NOW())
+     WHERE g.status = 'open'
+       AND g.black_player_id IS NULL
+       AND g.id <> keepers.keep_id`,
+  );
+}
+
 router.get('/', async (req, res, next) => {
   try {
+    await closeDuplicateOpenGames();
     const params = [];
     let where = "WHERE g.status IN ('open', 'active')";
     if (req.user.role === 'player') {
@@ -89,7 +109,8 @@ router.get('/history', async (req, res, next) => {
 
 router.post('/', requireActive, async (req, res, next) => {
   try {
-    await requireNoCurrentGame(req.user.id);
+    await closeDuplicateOpenGames();
+    await requireNoOpenGame(req.user.id);
     const result = await query(
       'INSERT INTO games (white_player_id, created_by, current_fen) VALUES (?, ?, ?)',
       [req.user.id, req.user.id, STARTING_FEN],
@@ -103,7 +124,6 @@ router.post('/', requireActive, async (req, res, next) => {
 
 router.post('/bot', requireActive, async (req, res, next) => {
   try {
-    await requireNoCurrentGame(req.user.id);
     const level = normalizeBotLevel(req.body.level);
     const result = await query(
       `INSERT INTO games (white_player_id, black_player_id, created_by, status, current_fen, result_reason)
@@ -119,7 +139,6 @@ router.post('/bot', requireActive, async (req, res, next) => {
 
 router.post('/:id/join', requireActive, async (req, res, next) => {
   try {
-    await requireNoCurrentGame(req.user.id);
     const games = await query('SELECT * FROM games WHERE id = ?', [req.params.id]);
     if (!games.length) return res.status(404).json({ message: 'Game not found.' });
     const game = games[0];

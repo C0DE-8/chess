@@ -1,0 +1,75 @@
+.page {
+  min-height: 100vh;
+  padding: 20px;
+  display: grid;
+  place-items: center;
+  background: #f7f2e8;
+}
+
+.panel {
+  width: min(440px, 100%);
+  padding: 26px;
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  border-radius: 8px;
+  background: #fffaf1;
+  box-shadow: 0 18px 42px rgba(25, 31, 28, 0.12);
+}
+
+.panel img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+}
+
+.panel p {
+  margin: 8px 0 0;
+  color: #81a15c;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.panel h1 {
+  margin: 0;
+  color: #183d3a;
+  font-size: 34px;
+  line-height: 1.05;
+}
+
+.panel span {
+  color: #63736b;
+  font-weight: 750;
+}
+
+.actions {
+  width: 100%;
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 7px;
+  background: #183d3a;
+  color: #fffaf1;
+  font-weight: 900;
+}
+
+.actions .secondary {
+  background: #e6dccb;
+  color: #183d3a;
+}
+
+@media (max-width: 480px) {
+  .panel {
+    padding: 20px;
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}

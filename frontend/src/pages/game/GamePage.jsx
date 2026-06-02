@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { API_URL, getToken } from '../../api/client';
 import { abortBotGame, analyzeGame, closeGame, createBotGame, createGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
+import { useToast } from '../../components/ToastProvider';
 import ChessBoard from '../../ui/game/ChessBoard';
 import styles from './GamePage.module.css';
 
@@ -45,7 +46,7 @@ function botLevelLabel(game) {
   return botLevelLabels[level] || 'Bot';
 }
 
-export default function GamePage({ user, games, refresh, notify }) {
+export default function GamePage({ user, games, refresh }) {
   const [selectedId, setSelectedId] = useState(games[0]?.id || '');
   const [game, setGame] = useState(null);
   const [message, setMessage] = useState('');
@@ -54,6 +55,7 @@ export default function GamePage({ user, games, refresh, notify }) {
   const [analysis, setAnalysis] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const socketRef = useRef(null);
+  const { notify } = useToast();
 
   const userColor = useMemo(() => playerColor(game, user.id), [game, user.id]);
   const lastMove = useMemo(() => game?.moves?.at(-1) || null, [game?.moves]);
@@ -90,13 +92,16 @@ export default function GamePage({ user, games, refresh, notify }) {
     socket.emit('game:join', { gameId: selectedId }, (response) => {
       if (response?.game) setGame(response.game);
     });
-    socket.on('game:updated', ({ game: updated, pendingBotMove }) => {
+    socket.on('game:updated', ({ game: updated, pendingBotMove, movedBy, movedByName, san }) => {
       setGame((current) => {
         if (current?.status !== 'completed' && updated?.status === 'completed') {
           notify?.('Game completed and moved to history.', 'success');
         }
         return updated;
       });
+      if (movedBy !== undefined && movedBy !== user.id) {
+        notify?.(`${movedByName || 'Opponent'} played ${san || 'a move'}.`, 'info');
+      }
       setIsBotThinking(Boolean(pendingBotMove));
       refresh();
     });
@@ -108,7 +113,7 @@ export default function GamePage({ user, games, refresh, notify }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [notify, refresh, selectedId]);
+  }, [notify, refresh, selectedId, user.id]);
 
   async function handleCreateGame() {
     try {

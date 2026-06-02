@@ -85,7 +85,15 @@ function socketEvents(io) {
 
         const pendingBotMove = !finished && isBotGame(game);
         const updated = await getGameWithMoves(gameId);
-        io.to(`game:${gameId}`).emit('game:updated', { game: updated, lastMove: move, finished, pendingBotMove });
+        io.to(`game:${gameId}`).emit('game:updated', {
+          game: updated,
+          lastMove: move,
+          movedBy: socket.user.id,
+          movedByName: socket.user.name,
+          san: move.san,
+          finished,
+          pendingBotMove,
+        });
         callback?.({ ok: true, game: updated });
 
         if (pendingBotMove) {
@@ -118,7 +126,15 @@ function scheduleBotMove(io, gameId) {
       }
 
       const updated = await getGameWithMoves(gameId);
-      io.to(`game:${gameId}`).emit('game:updated', { game: updated, lastMove: botResult.move, finished, pendingBotMove: false });
+      io.to(`game:${gameId}`).emit('game:updated', {
+        game: updated,
+        lastMove: botResult.move,
+        movedBy: null,
+        movedByName: 'Stockfish',
+        san: botResult.move.san,
+        finished,
+        pendingBotMove: false,
+      });
     } catch (error) {
       io.to(`game:${gameId}`).emit('game:bot-error', { message: error.message || 'Bot move failed.' });
     } finally {
