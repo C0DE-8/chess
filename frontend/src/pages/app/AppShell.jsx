@@ -141,7 +141,7 @@ export default function AppShell({ page, routes, session }) {
         </header>
         {page === 'dashboard' && <DashboardPage user={user} workspace={workspace} />}
         {page === 'profile' && <ProfilePage user={user} />}
-        {page === 'game' && <GamePage user={user} games={workspace.games} />}
+        {page === 'game' && <GamePage user={user} games={workspace.games} refresh={refresh} />}
         {page === 'play' && <PlayPage user={user} games={workspace.games} refresh={refresh} />}
         {page === 'history' && <HistoryPage games={workspace.history} />}
         {page === 'leaderboard' && <LeaderboardPage leaderboard={workspace.leaderboard} />}

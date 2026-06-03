@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { API_URL, getToken } from '../../api/client';
-import { abortBotGame, analyzeGame, closeGame, createBotGame, createGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
+import { SOCKET_URL, getToken } from '../../api/client';
+import { abortBotGame, analyzeGame, closeGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
 import { useToast } from '../../components/ToastProvider';
 import ChessBoard from '../../ui/game/ChessBoard';
 import styles from './PlayPage.module.css';
@@ -54,7 +54,6 @@ export default function PlayPage({ user, games, refresh }) {
   const selectedId = gameId || '';
   const [game, setGame] = useState(null);
   const [message, setMessage] = useState('');
-  const [botLevel, setBotLevel] = useState('beginner');
   const [isBotThinking, setIsBotThinking] = useState(false);
   const [analysis, setAnalysis] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -130,9 +129,10 @@ export default function PlayPage({ user, games, refresh }) {
 
   useEffect(() => {
     if (!selectedId || !getToken()) return undefined;
-    const socket = io(API_URL, {
+    const socket = io(SOCKET_URL, {
       auth: { token: getToken() },
       transports: ['websocket', 'polling'],
+      tryAllTransports: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 500,
@@ -158,7 +158,7 @@ export default function PlayPage({ user, games, refresh }) {
     }
 
     socket.on('connect', () => {
-      console.info('[socket] connected', { id: socket.id, transport: socket.io.engine.transport.name, gameId: selectedId });
+      console.info('[socket] connected', { id: socket.id, url: SOCKET_URL, transport: socket.io.engine.transport.name, gameId: selectedId });
       joinCurrentGame();
     });
     socket.io.on('reconnect', (attempt) => {
@@ -173,7 +173,7 @@ export default function PlayPage({ user, games, refresh }) {
       console.info('[socket] disconnected', { reason, gameId: selectedId });
     });
     socket.on('connect_error', (error) => {
-      console.info('[socket] connect error', { message: error.message, gameId: selectedId });
+      console.info('[socket] connect error', { message: error.message, url: SOCKET_URL, gameId: selectedId });
     });
     socket.on('game:state', (payload) => applySocketGameUpdate(payload, { notifyMove: false }));
     socket.on('game:move-applied', (payload) => applySocketGameUpdate(payload));
@@ -189,32 +189,6 @@ export default function PlayPage({ user, games, refresh }) {
       socketRef.current = null;
     };
   }, [applySocketGameUpdate, selectedId]);
-
-  async function handleCreateGame() {
-    try {
-      const data = await createGame();
-      navigate(`/play/${data.id}`);
-      setMessage('Game created.');
-      notify?.('Game created.', 'success');
-      refresh();
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    }
-  }
-
-  async function handleCreateBotGame() {
-    try {
-      const data = await createBotGame(botLevel);
-      navigate(`/play/${data.id}`);
-      setMessage(`Bot game started at ${botLevel} level.`);
-      notify?.(`Bot game started at ${botLevel} level.`, 'success');
-      refresh();
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    }
-  }
 
   async function handleJoinGame(id) {
     try {
@@ -397,9 +371,9 @@ export default function PlayPage({ user, games, refresh }) {
           <div className={styles.panelHead}>
             <div>
               <h2>Live Game</h2>
-              <p>{game ? `Game #${game.id} · ${game.status}` : selectedListGame ? `Game #${selectedListGame.id} · ${selectedListGame.status}` : 'Create a game or choose one from Games'}</p>
+              <p>{game ? `Game #${game.id} · ${game.status}` : selectedListGame ? `Game #${selectedListGame.id} · ${selectedListGame.status}` : 'Choose or create a game from Games'}</p>
             </div>
-            <button className={styles.primary} onClick={handleCreateGame} disabled={user.status !== 'active'} type="button">New</button>
+            <button className={styles.primary} onClick={() => navigate('/game')} type="button">Games</button>
           </div>
 
           {user.status !== 'active' && <p className={styles.notice}>Your account must be approved before you can play.</p>}
@@ -407,16 +381,6 @@ export default function PlayPage({ user, games, refresh }) {
             {game ? `${userColor || 'Spectator'} view. ${isPlayable ? 'Your move: click a piece.' : `Waiting for ${turnColor(game.current_fen)}.`}` : selectedListGame ? `${selectedListGame.white_name || 'White'} vs ${selectedListGame.black_name || 'Waiting'}. Join this open game to play.` : 'Open Games, then choose a game to play.'}
           </p>
           {message && <p className={styles.notice}>{message}</p>}
-
-          <div className={styles.botPanel}>
-            <label>
-              Bot level
-              <select value={botLevel} onChange={(event) => setBotLevel(event.target.value)}>
-                {botLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
-              </select>
-            </label>
-            <button className={styles.secondary} onClick={handleCreateBotGame} disabled={user.status !== 'active'} type="button">Play bot</button>
-          </div>
 
           {game && (
             <div className={styles.actionPanel}>

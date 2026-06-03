@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createBotGame, createGame } from '../../api/gamesApi';
+import { useToast } from '../../components/ToastProvider';
 import styles from './GamePage.module.css';
+
+const botLevels = [
+  { value: 'newbie', label: 'Newbie' },
+  { value: 'beginner', label: 'Beginner' },
+  { value: 'novice', label: 'Novice' },
+  { value: 'intermediate', label: 'Intermediate' },
+  { value: 'advanced', label: 'Advanced' },
+];
 
 const filters = [
   { value: 'all', label: 'All games' },
@@ -38,10 +48,13 @@ function statusText(game) {
   return game.status;
 }
 
-export default function GamePage({ user, games }) {
+export default function GamePage({ user, games, refresh }) {
   const navigate = useNavigate();
+  const { notify } = useToast();
   const [activeFilter, setActiveFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [botLevel, setBotLevel] = useState('beginner');
+  const [message, setMessage] = useState('');
 
   const filteredGames = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -70,6 +83,32 @@ export default function GamePage({ user, games }) {
     bots: games.filter(isBotGame).length,
   }), [games, user.id]);
 
+  async function handleCreateGame() {
+    try {
+      const data = await createGame();
+      setMessage('Game created.');
+      notify?.('Game created.', 'success');
+      await refresh();
+      navigate(`/play/${data.id}`);
+    } catch (error) {
+      setMessage(error.message);
+      notify?.(error.message, 'error');
+    }
+  }
+
+  async function handleCreateBotGame() {
+    try {
+      const data = await createBotGame(botLevel);
+      setMessage(`Bot game started at ${botLevel} level.`);
+      notify?.(`Bot game started at ${botLevel} level.`, 'success');
+      await refresh();
+      navigate(`/play/${data.id}`);
+    } catch (error) {
+      setMessage(error.message);
+      notify?.(error.message, 'error');
+    }
+  }
+
   return (
     <section className={styles.games}>
       <div className={styles.head}>
@@ -79,6 +118,24 @@ export default function GamePage({ user, games }) {
         </div>
         <strong>{filteredGames.length}</strong>
       </div>
+
+      <div className={styles.createPanel}>
+        <button className={styles.primary} onClick={handleCreateGame} disabled={user.status !== 'active'} type="button">
+          New game
+        </button>
+        <label className={styles.botControl}>
+          <span>Bot level</span>
+          <select value={botLevel} onChange={(event) => setBotLevel(event.target.value)}>
+            {botLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
+          </select>
+        </label>
+        <button className={styles.secondary} onClick={handleCreateBotGame} disabled={user.status !== 'active'} type="button">
+          Play bot
+        </button>
+      </div>
+
+      {user.status !== 'active' && <p className={styles.notice}>Your account must be approved before you can create or join games.</p>}
+      {message && <p className={styles.notice}>{message}</p>}
 
       <div className={styles.toolbar}>
         <label className={styles.search}>
