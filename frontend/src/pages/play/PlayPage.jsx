@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { SOCKET_URL, getToken } from '../../api/client';
+import { SOCKET_TRANSPORTS, SOCKET_URL, getToken } from '../../api/client';
 import { abortBotGame, analyzeGame, closeGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
 import { useToast } from '../../components/ToastProvider';
 import ChessBoard from '../../ui/game/ChessBoard';
@@ -131,7 +131,7 @@ export default function PlayPage({ user, games, refresh }) {
     if (!selectedId || !getToken()) return undefined;
     const socket = io(SOCKET_URL, {
       auth: { token: getToken() },
-      transports: ['websocket', 'polling'],
+      transports: SOCKET_TRANSPORTS,
       tryAllTransports: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -158,7 +158,7 @@ export default function PlayPage({ user, games, refresh }) {
     }
 
     socket.on('connect', () => {
-      console.info('[socket] connected', { id: socket.id, url: SOCKET_URL, transport: socket.io.engine.transport.name, gameId: selectedId });
+      console.info('[socket] connected', { id: socket.id, url: SOCKET_URL, transport: socket.io.engine.transport.name, configuredTransports: SOCKET_TRANSPORTS, gameId: selectedId });
       joinCurrentGame();
     });
     socket.io.on('reconnect', (attempt) => {
@@ -173,7 +173,7 @@ export default function PlayPage({ user, games, refresh }) {
       console.info('[socket] disconnected', { reason, gameId: selectedId });
     });
     socket.on('connect_error', (error) => {
-      console.info('[socket] connect error', { message: error.message, url: SOCKET_URL, gameId: selectedId });
+      console.info('[socket] connect error', { message: error.message, url: SOCKET_URL, configuredTransports: SOCKET_TRANSPORTS, gameId: selectedId });
     });
     socket.on('game:state', (payload) => applySocketGameUpdate(payload, { notifyMove: false }));
     socket.on('game:move-applied', (payload) => applySocketGameUpdate(payload));

@@ -1,6 +1,27 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_URL;
 
+function socketTransports() {
+  const configured = import.meta.env.VITE_SOCKET_TRANSPORTS;
+  if (configured) {
+    return configured
+      .split(',')
+      .map((transport) => transport.trim())
+      .filter(Boolean);
+  }
+
+  try {
+    const host = new URL(SOCKET_URL).hostname;
+    if (host.endsWith('.vercel.app')) return ['polling'];
+  } catch {
+    return ['websocket', 'polling'];
+  }
+
+  return ['websocket', 'polling'];
+}
+
+export const SOCKET_TRANSPORTS = socketTransports();
+
 export function getToken() {
   return localStorage.getItem('knightclub_token');
 }
