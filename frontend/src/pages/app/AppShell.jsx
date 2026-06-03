@@ -11,6 +11,7 @@ import DashboardPage from '../dashboard/DashboardPage';
 import GamePage from '../game/GamePage';
 import HistoryPage from '../history/HistoryPage';
 import LeaderboardPage from '../leaderboard/LeaderboardPage';
+import PlayPage from '../play/PlayPage';
 import ProfilePage from '../profile/ProfilePage';
 import TournamentsPage from '../tournaments/TournamentsPage';
 import logo from '../../assets/images/logo.png';
@@ -64,11 +65,15 @@ export default function AppShell({ page, routes, session }) {
   }, [fetchWorkspace]);
 
   useEffect(() => {
-    setIsMobileNavOpen(false);
+    queueMicrotask(() => setIsMobileNavOpen(false));
   }, [location.pathname]);
 
   const availableRoutes = routes.filter((route) => !route.publicOnly && (!route.adminOnly || user.role !== 'player'));
-  const activeRoute = availableRoutes.find((route) => route.path === location.pathname) || availableRoutes[0];
+  const visibleRoutes = availableRoutes.filter((route) => !route.hidden);
+  const activeRoute = availableRoutes.find((route) => (
+    route.path === location.pathname
+    || (route.path !== '/' && location.pathname.startsWith(`${route.path}/`))
+  )) || visibleRoutes[0];
 
   function logout() {
     session.logout();
@@ -81,7 +86,7 @@ export default function AppShell({ page, routes, session }) {
   }
 
   function renderNavButtons() {
-    return availableRoutes.map((route) => (
+    return visibleRoutes.map((route) => (
       <button
         className={activeRoute.path === route.path ? styles.active : ''}
         onClick={() => goToRoute(route.path)}
@@ -136,7 +141,8 @@ export default function AppShell({ page, routes, session }) {
         </header>
         {page === 'dashboard' && <DashboardPage user={user} workspace={workspace} />}
         {page === 'profile' && <ProfilePage user={user} />}
-        {page === 'game' && <GamePage user={user} games={workspace.games} refresh={refresh} />}
+        {page === 'game' && <GamePage user={user} games={workspace.games} />}
+        {page === 'play' && <PlayPage user={user} games={workspace.games} refresh={refresh} />}
         {page === 'history' && <HistoryPage games={workspace.history} />}
         {page === 'leaderboard' && <LeaderboardPage leaderboard={workspace.leaderboard} />}
         {page === 'tournaments' && <TournamentsPage tournaments={workspace.tournaments} />}

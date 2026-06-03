@@ -37,6 +37,11 @@ const io = new Server(server, {
     origin: allowedOrigins,
     credentials: true,
   },
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 120000,
+    skipMiddlewares: false,
+  },
+  transports: ['websocket', 'polling'],
 });
 
 app.use(helmet());

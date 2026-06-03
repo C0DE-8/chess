@@ -1,457 +1,143 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Chess } from 'chess.js';
-import { io } from 'socket.io-client';
-import { API_URL, getToken } from '../../api/client';
-import { abortBotGame, analyzeGame, closeGame, createBotGame, createGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
-import { useToast } from '../../components/ToastProvider';
-import ChessBoard from '../../ui/game/ChessBoard';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styles from './GamePage.module.css';
 
-const botLevels = [
-  { value: 'newbie', label: 'Newbie' },
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'novice', label: 'Novice' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' },
+const filters = [
+  { value: 'all', label: 'All games' },
+  { value: 'mine', label: 'My games' },
+  { value: 'bots', label: 'Bot games' },
 ];
 
-const botLevelLabels = Object.fromEntries(botLevels.map((level) => [level.value, level.label]));
-
-function playerColor(game, userId) {
-  if (!game) return null;
-  if (game.white_player_id === userId) return 'white';
-  if (game.black_player_id === userId) return 'black';
-  return null;
-}
-
-function turnColor(fen) {
-  return fen?.split(' ')[1] === 'b' ? 'black' : 'white';
-}
-
-function playerName(game, color) {
-  if (!game) return color === 'white' ? 'White' : 'Black';
-  return color === 'white' ? game.white_name || 'White' : game.black_name || 'Waiting';
-}
-
-function playerId(game, color) {
-  if (!game) return null;
-  return color === 'white' ? game.white_player_id : game.black_player_id;
-}
-
-function isBotRecord(game) {
+function isBotGame(game) {
   return Boolean(game?.black_player_id == null && String(game?.result_reason || '').startsWith('bot:'));
 }
 
-function botLevelLabel(game) {
-  const level = String(game?.result_reason || '').replace('bot:', '');
-  return botLevelLabels[level] || 'Bot';
+function isOwnGame(game, userId) {
+  return [game.white_player_id, game.black_player_id, game.created_by].includes(userId);
 }
 
-export default function GamePage({ user, games, refresh }) {
-  const [selectedId, setSelectedId] = useState(games[0]?.id || '');
-  const [game, setGame] = useState(null);
-  const [message, setMessage] = useState('');
-  const [botLevel, setBotLevel] = useState('beginner');
-  const [isBotThinking, setIsBotThinking] = useState(false);
-  const [analysis, setAnalysis] = useState([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [dismissedWinnerGameId, setDismissedWinnerGameId] = useState(null);
-  const socketRef = useRef(null);
-  const { notify } = useToast();
+function botLabel(game) {
+  if (!isBotGame(game)) return '';
+  const level = String(game.result_reason || '').replace('bot:', '');
+  return level ? `Bot: ${level}` : 'Bot game';
+}
 
-  const userColor = useMemo(() => playerColor(game, user.id), [game, user.id]);
-  const lastMove = useMemo(() => game?.moves?.at(-1) || null, [game?.moves]);
-  const isBotGame = isBotRecord(game);
-  const canCloseGame = Boolean(game?.status === 'open' && game.created_by === user.id && !game.black_player_id);
-  const canResignGame = Boolean(game?.status === 'active' && userColor && !isBotGame);
-  const canAbortBotGame = Boolean(game?.status === 'active' && isBotGame && game.white_player_id === user.id);
-  const orientation = userColor === 'black' ? 'black' : 'white';
-  const topColor = orientation === 'black' ? 'white' : 'black';
-  const bottomColor = orientation === 'black' ? 'black' : 'white';
-  const isPlayable = Boolean(
-    game?.status === 'active'
-    && user.status === 'active'
-    && userColor
-    && turnColor(game.current_fen) === userColor,
-  );
-  const gameAlert = useMemo(() => buildGameAlert(game), [game]);
-  const showWinnerModal = Boolean(game?.status === 'completed' && dismissedWinnerGameId !== game.id);
+function formatDate(value) {
+  if (!value) return 'No date';
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
 
-  useEffect(() => {
-    if (!selectedId && games[0]?.id) {
-      queueMicrotask(() => setSelectedId(games[0].id));
-    }
-  }, [games, selectedId]);
+function statusText(game) {
+  if (game.status === 'open') return 'Open';
+  if (game.status === 'active') return 'In progress';
+  return game.status;
+}
 
-  useEffect(() => {
-    if (!selectedId) return;
-    setAnalysis([]);
-    setDismissedWinnerGameId(null);
-    getGame(selectedId).then((data) => setGame(data.game)).catch(() => setGame(null));
-  }, [selectedId]);
+export default function GamePage({ user, games }) {
+  const navigate = useNavigate();
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    if (!selectedId || !getToken()) return undefined;
-    const socket = io(API_URL, { auth: { token: getToken() } });
-    socketRef.current = socket;
-    socket.emit('game:join', { gameId: selectedId }, (response) => {
-      if (response?.game) setGame(response.game);
+  const filteredGames = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+
+    return games.filter((game) => {
+      if (activeFilter === 'mine' && !isOwnGame(game, user.id)) return false;
+      if (activeFilter === 'bots' && !isBotGame(game)) return false;
+      if (!needle) return true;
+
+      const haystack = [
+        game.id,
+        game.status,
+        game.white_name,
+        game.black_name,
+        game.result_reason,
+        botLabel(game),
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      return haystack.includes(needle);
     });
-    socket.on('game:updated', ({ game: updated, pendingBotMove, movedBy, movedByName, san }) => {
-      setGame((current) => {
-        if (current?.status !== 'completed' && updated?.status === 'completed') {
-          notify?.('Game completed and moved to history.', 'success');
-        }
-        return updated;
-      });
-      if (movedBy !== undefined && movedBy !== user.id) {
-        notify?.(`${movedByName || 'Opponent'} played ${san || 'a move'}.`, 'info');
-      }
-      setIsBotThinking(Boolean(pendingBotMove));
-      refresh();
-    });
-    socket.on('game:bot-error', ({ message: errorMessage }) => {
-      setIsBotThinking(false);
-      setMessage(errorMessage || 'Bot move failed.');
-    });
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [notify, refresh, selectedId, user.id]);
+  }, [activeFilter, games, search, user.id]);
 
-  async function handleCreateGame() {
-    try {
-      const data = await createGame();
-      setSelectedId(data.id);
-      setMessage('Game created.');
-      notify?.('Game created.', 'success');
-      refresh();
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    }
-  }
-
-  async function handleCreateBotGame() {
-    try {
-      const data = await createBotGame(botLevel);
-      setSelectedId(data.id);
-      setMessage(`Bot game started at ${botLevel} level.`);
-      notify?.(`Bot game started at ${botLevel} level.`, 'success');
-      refresh();
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    }
-  }
-
-  async function handleJoinGame(id) {
-    try {
-      await joinGame(id);
-      setSelectedId(id);
-      setMessage('Game joined.');
-      notify?.('Game joined.', 'success');
-      refresh();
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    }
-  }
-
-  async function handleCloseGame() {
-    if (!game) return;
-    await handleCloseOpenGame(game.id);
-  }
-
-  async function handleCloseOpenGame(id) {
-    try {
-      await closeGame(id);
-      setMessage('Game closed.');
-      notify?.('Game closed.', 'success');
-      if (String(id) === String(game?.id)) {
-        setGame({ ...game, status: 'cancelled', result: 'abandoned', result_reason: 'closed_by_creator' });
-      }
-      refresh();
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    }
-  }
-
-  async function handleResignGame() {
-    if (!game) return;
-    try {
-      const data = await resignGame(game.id);
-      setMessage('You resigned the game.');
-      notify?.('Game completed by resignation.', 'success');
-      if (data.game) setGame(data.game);
-      refresh();
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    }
-  }
-
-  async function handleAbortBotGame() {
-    if (!game) return;
-    try {
-      await abortBotGame(game.id);
-      setMessage('Bot game aborted.');
-      notify?.('Bot game aborted.', 'success');
-      setGame({ ...game, status: 'cancelled', result: 'abandoned', result_reason: 'bot_aborted' });
-      refresh();
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    }
-  }
-
-  function handleBoardMove(move) {
-    setMessage('');
-    const previousGame = game;
-
-    try {
-      const chess = new Chess(game.current_fen);
-      const played = chess.move({ from: move.from, to: move.to, promotion: move.promotion || undefined });
-      if (played) {
-        const optimisticMove = {
-          id: `pending-${Date.now()}`,
-          move_number: (game.moves?.length || 0) + 1,
-          from_square: played.from,
-          to_square: played.to,
-          promotion: played.promotion || null,
-          san: played.san,
-          fen_after: chess.fen(),
-          player_id: user.id,
-          player_name: user.name,
-        };
-
-        setGame({
-          ...game,
-          current_fen: chess.fen(),
-          pgn: chess.pgn(),
-          moves: [...(game.moves || []), optimisticMove],
-        });
-      }
-    } catch {
-      // The server remains the source of truth for illegal or stale moves.
-    }
-
-    setIsBotThinking(isBotGame);
-    socketRef.current?.emit('game:move', { gameId: selectedId, ...move }, (response) => {
-      setMessage(response.ok ? 'Move saved.' : response.message);
-      if (!response.ok) {
-        setIsBotThinking(false);
-        if (previousGame) setGame(previousGame);
-        notify?.(response.message || 'Move failed.', 'error');
-      }
-      if (response.game) setGame(response.game);
-    });
-  }
-
-  async function handleAnalyzeGame() {
-    if (!game) return;
-    setIsAnalyzing(true);
-    setMessage('');
-    try {
-      const data = await analyzeGame(game.id);
-      setAnalysis(data.analysis || []);
-      notify?.('Analysis complete.', 'success');
-    } catch (error) {
-      setMessage(error.message);
-      notify?.(error.message, 'error');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }
+  const counts = useMemo(() => ({
+    all: games.length,
+    mine: games.filter((game) => isOwnGame(game, user.id)).length,
+    bots: games.filter(isBotGame).length,
+  }), [games, user.id]);
 
   return (
-    <section className={styles.workspace}>
-      <div className={styles.gameLayout}>
-        <div className={styles.playArea}>
-          <div className={styles.playerBar}>
-            <span className={styles.avatar}>{topColor === 'white' ? '♙' : '♟'}</span>
-            <div>
-              <strong>{playerName(game, topColor)}</strong>
-              <small>{topColor} {playerId(game, topColor) === user.id ? 'you' : isBotGame && topColor === 'black' ? botLevelLabel(game) : ''}</small>
-            </div>
-            {isBotThinking && isBotGame && topColor === 'black' && (
-              <span className={styles.thinkingBubble}>Bot is thinking</span>
-            )}
-          </div>
-
-          {gameAlert && (
-            <div className={`${styles.statusAlert} ${styles[gameAlert.type] || ''}`}>
-              <strong>{gameAlert.title}</strong>
-              <span>{gameAlert.body}</span>
-            </div>
-          )}
-
-          <ChessBoard
-            fen={game?.current_fen}
-            userColor={userColor}
-            orientation={orientation}
-            isPlayable={isPlayable}
-            lastMove={lastMove}
-            onMove={handleBoardMove}
-          />
-
-          <div className={styles.playerBar}>
-            <span className={styles.avatar}>{bottomColor === 'white' ? '♙' : '♟'}</span>
-            <div>
-              <strong>{playerName(game, bottomColor)}</strong>
-              <small>{bottomColor} {playerId(game, bottomColor) === user.id ? 'you' : isBotGame && bottomColor === 'black' ? botLevelLabel(game) : ''}</small>
-            </div>
-            {isBotThinking && isBotGame && bottomColor === 'black' && (
-              <span className={styles.thinkingBubble}>Bot is thinking</span>
-            )}
-          </div>
-
-          {showWinnerModal && (
-            <div className={styles.winnerOverlay} role="dialog" aria-modal="true" aria-labelledby="winner-title">
-              <div className={styles.winnerModal}>
-                <p>{game.result_reason || 'Game complete'}</p>
-                <h3 id="winner-title">{winnerText(game)}</h3>
-                <span>{game.white_name || 'White'} vs {game.black_name || 'Black'}</span>
-                <button onClick={() => setDismissedWinnerGameId(game.id)} type="button">Close</button>
-              </div>
-            </div>
-          )}
+    <section className={styles.games}>
+      <div className={styles.head}>
+        <div>
+          <h2>Games</h2>
+          <p>Find an open or active game, then open it on the play page.</p>
         </div>
+        <strong>{filteredGames.length}</strong>
+      </div>
 
-        <aside className={styles.sidePanel}>
-          <div className={styles.panelHead}>
-            <div>
-              <h2>Live Game</h2>
-              <p>{game ? `Game #${game.id} · ${game.status}` : 'Select or create a game'}</p>
-            </div>
-            <button className={styles.primary} onClick={handleCreateGame} disabled={user.status !== 'active'} type="button">New</button>
-          </div>
+      <div className={styles.toolbar}>
+        <label className={styles.search}>
+          <span>Search games</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by player, bot, status, or ID"
+            type="search"
+          />
+        </label>
 
-          {user.status !== 'active' && <p className={styles.notice}>Your account must be approved before you can play.</p>}
-          <p className={styles.turnText}>
-            {game ? `${userColor || 'Spectator'} view. ${isPlayable ? 'Your move: click a piece.' : `Waiting for ${turnColor(game.current_fen)}.`}` : 'Choose an open game.'}
-          </p>
-          {message && <p className={styles.notice}>{message}</p>}
+        <div className={styles.filters} aria-label="Game filters">
+          {filters.map((filter) => (
+            <button
+              className={activeFilter === filter.value ? styles.activeFilter : ''}
+              key={filter.value}
+              onClick={() => setActiveFilter(filter.value)}
+              type="button"
+            >
+              <span>{filter.label}</span>
+              <strong>{counts[filter.value]}</strong>
+            </button>
+          ))}
+        </div>
+      </div>
 
-          <div className={styles.botPanel}>
-            <label>
-              Bot level
-              <select value={botLevel} onChange={(event) => setBotLevel(event.target.value)}>
-                {botLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
-              </select>
-            </label>
-            <button className={styles.secondary} onClick={handleCreateBotGame} disabled={user.status !== 'active'} type="button">Play bot</button>
-          </div>
+      <div className={styles.list}>
+        {filteredGames.length === 0 && (
+          <p className={styles.empty}>No games match this search.</p>
+        )}
 
-          {game && (
-            <div className={styles.actionPanel}>
-              {canCloseGame && <button onClick={handleCloseGame} type="button">Close open game</button>}
-              {canResignGame && <button onClick={handleResignGame} type="button">Resign</button>}
-              {canAbortBotGame && <button onClick={handleAbortBotGame} type="button">Abort bot game</button>}
-            </div>
-          )}
+        {filteredGames.map((game) => {
+          const ownGame = isOwnGame(game, user.id);
+          const botGame = isBotGame(game);
 
-          <div className={styles.movePanel}>
-            <div className={styles.movePanelHead}>
-              <h3>Moves</h3>
-              <button onClick={handleAnalyzeGame} disabled={!game?.moves?.length || isAnalyzing} type="button">
-                {isAnalyzing ? 'Analyzing' : 'Analyze'}
-              </button>
-            </div>
-            <ol className={styles.moves}>
-              {(game?.moves || []).map((item) => (
-                <li className={item.id === lastMove?.id ? styles.latestMove : ''} key={item.id}>
-                  <span>{item.move_number}.</span>
-                  {item.san}
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          {analysis.length > 0 && (
-            <div className={styles.analysisPanel}>
-              <h3>Stockfish Analysis</h3>
-              <ol>
-                {analysis.map((item) => (
-                  <li key={item.moveId}>
-                    <span>{item.moveNumber}. {item.san}</span>
-                    <strong>{formatEvaluation(item.evaluation)}</strong>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          <div className={styles.gameList}>
-            <h3>Club Games</h3>
-            {games.map((item) => {
-              const botGame = isBotRecord(item);
-              const isSelected = String(item.id) === String(selectedId);
-              const canJoin = item.status === 'open' && item.white_player_id !== user.id;
-              const canClose = item.status === 'open' && item.created_by === user.id && !item.black_player_id;
-
-              return (
-                <div className={isSelected ? `${styles.gameRowWrap} ${styles.active}` : styles.gameRowWrap} key={item.id}>
-                  <button className={styles.gameRow} onClick={() => setSelectedId(item.id)} type="button">
-                    <span>#{item.id} {item.white_name || 'Open'} vs {item.black_name || 'Waiting'}</span>
-                    <small>{item.status}{botGame ? ` · ${botLevelLabel(item)}` : ''}</small>
-                  </button>
-                  {(canJoin || canClose) && (
-                    <div className={styles.gameRowActions}>
-                      {canJoin && <button onClick={() => handleJoinGame(item.id)} type="button">Join</button>}
-                      {canClose && <button onClick={() => handleCloseOpenGame(item.id)} type="button">Close</button>}
-                    </div>
-                  )}
+          return (
+            <button
+              className={styles.row}
+              key={game.id}
+              onClick={() => navigate(`/play/${game.id}`)}
+              type="button"
+            >
+              <div className={styles.matchup}>
+                <span className={styles.gameId}>#{game.id}</span>
+                <div>
+                  <h3>{game.white_name || 'White'} vs {game.black_name || 'Waiting'}</h3>
+                  <p>{botGame ? botLabel(game) : ownGame ? 'Your game' : 'Club game'}</p>
                 </div>
-              );
-            })}
-          </div>
-        </aside>
+              </div>
+
+              <div className={styles.meta}>
+                <span className={`${styles.status} ${styles[game.status] || ''}`}>{statusText(game)}</span>
+                <time>{formatDate(game.created_at)}</time>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
-}
-
-function formatEvaluation(evaluation) {
-  if (!evaluation) return 'No score';
-  if (evaluation.type === 'mate') return `Mate ${evaluation.value}`;
-  if (evaluation.type === 'cp') return `${evaluation.value > 0 ? '+' : ''}${(evaluation.value / 100).toFixed(2)}`;
-  return 'No score';
-}
-
-function buildGameAlert(game) {
-  if (!game?.current_fen) return null;
-  if (game.status === 'completed') {
-    const isCheckmateFinish = game.result_reason === 'checkmate';
-    return {
-      type: game.result === 'draw' ? 'drawAlert' : 'mateAlert',
-      title: game.result === 'draw' ? 'Draw' : isCheckmateFinish ? 'Checkmate' : 'Game over',
-      body: winnerText(game),
-    };
-  }
-  if (game.status === 'cancelled') {
-    return { type: 'drawAlert', title: 'Game closed', body: game.result_reason || 'This game is no longer active.' };
-  }
-
-  try {
-    const chess = new Chess(game.current_fen);
-    if (chess.isCheckmate()) return { type: 'mateAlert', title: 'Checkmate', body: winnerText(game) };
-    if (chess.isStalemate()) return { type: 'drawAlert', title: 'Stalemate', body: 'No legal moves. The game is drawn.' };
-    if (chess.isDraw()) return { type: 'drawAlert', title: 'Draw', body: 'The position is drawn.' };
-    if (chess.inCheck()) return { type: 'checkAlert', title: 'Check', body: `${turnColor(game.current_fen)} is in check.` };
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function winnerText(game) {
-  if (!game) return 'Game complete';
-  if (game.result === 'draw') return 'The game ended in a draw.';
-  if (game.result === 'white_win') return `${game.white_name || 'White'} wins.`;
-  if (game.result === 'black_win') return `${game.black_name || 'Black'} wins.`;
-  if (game.result === 'abandoned') return 'The game was closed.';
-  return 'Game complete.';
 }

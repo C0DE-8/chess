@@ -10,7 +10,8 @@ const routes = [
   { path: '/auth', label: 'Auth', publicOnly: true },
   { path: '/dashboard', label: 'Dashboard' },
   { path: '/profile', label: 'Profile' },
-  { path: '/game', label: 'Game' },
+  { path: '/game', label: 'Games' },
+  { path: '/play', label: 'Play' },
   { path: '/history', label: 'History' },
   { path: '/leaderboard', label: 'Leaderboard' },
   { path: '/tournaments', label: 'Tournaments' },
@@ -35,6 +36,8 @@ function App() {
           <Route path="/dashboard" element={<AppShell page="dashboard" routes={routes} session={session} />} />
           <Route path="/profile" element={<AppShell page="profile" routes={routes} session={session} />} />
           <Route path="/game" element={<AppShell page="game" routes={routes} session={session} />} />
+          <Route path="/play" element={<AppShell page="play" routes={routes} session={session} />} />
+          <Route path="/play/:gameId" element={<AppShell page="play" routes={routes} session={session} />} />
           <Route path="/history" element={<AppShell page="history" routes={routes} session={session} />} />
           <Route path="/leaderboard" element={<AppShell page="leaderboard" routes={routes} session={session} />} />
           <Route path="/tournaments" element={<AppShell page="tournaments" routes={routes} session={session} />} />
