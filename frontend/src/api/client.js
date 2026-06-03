@@ -1,6 +1,21 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_URL;
 
+function isVercelSocketHost() {
+  try {
+    return new URL(SOCKET_URL).hostname.endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
+}
+
+function socketEnabled() {
+  const configured = import.meta.env.VITE_SOCKET_ENABLED;
+  if (configured === 'true') return true;
+  if (configured === 'false') return false;
+  return !isVercelSocketHost();
+}
+
 function socketTransports() {
   const configured = import.meta.env.VITE_SOCKET_TRANSPORTS;
   if (configured) {
@@ -20,6 +35,7 @@ function socketTransports() {
   return ['websocket', 'polling'];
 }
 
+export const SOCKET_ENABLED = socketEnabled();
 export const SOCKET_TRANSPORTS = socketTransports();
 
 export function getToken() {

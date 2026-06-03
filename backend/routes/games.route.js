@@ -1,8 +1,8 @@
 const express = require('express');
 const { query } = require('../config/database');
 const { authenticate, requireActive, requireAdmin } = require('../middleware/auth');
-const { STARTING_FEN, completeGame, getGameWithMoves } = require('../lib/game');
-const { BOT_LEVELS, botName, isBotGame, normalizeBotLevel } = require('../lib/bot');
+const { STARTING_FEN, applyPlayerMove, completeGame, getGameWithMoves } = require('../lib/game');
+const { BOT_LEVELS, applyBotMoveIfNeeded, botName, isBotGame, normalizeBotLevel } = require('../lib/bot');
 const { evaluateFen, stockfishAvailable } = require('../lib/stockfish');
 const { getStockfishEnabled } = require('../lib/settings');
 const { logActivity } = require('../lib/activity');
@@ -208,6 +208,41 @@ router.post('/:id/abort', requireActive, async (req, res, next) => {
     );
     await logActivity(req.user.id, 'bot_game_aborted', 'game', game.id);
     res.json({ message: 'Bot game aborted.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/move', requireActive, async (req, res, next) => {
+  try {
+    const payload = await applyPlayerMove(req.params.id, req.user, {
+      from: req.body.from,
+      to: req.body.to,
+      promotion: req.body.promotion,
+    });
+
+    let botMove = null;
+    let botFinished = null;
+    if (payload.pendingBotMove) {
+      const botResult = await applyBotMoveIfNeeded(req.params.id);
+      if (botResult) {
+        if (botResult.chess.isCheckmate()) {
+          botFinished = await completeGame(req.params.id, botResult.chess.turn() === 'w' ? 'black_win' : 'white_win', 'checkmate');
+        } else if (botResult.chess.isDraw() || botResult.chess.isStalemate()) {
+          botFinished = await completeGame(req.params.id, 'draw', botResult.chess.isStalemate() ? 'stalemate' : 'draw');
+        }
+        botMove = botResult.move;
+      }
+    }
+
+    const game = await getGameWithMoves(req.params.id);
+    res.json({
+      ...payload,
+      game,
+      botMove,
+      finished: botFinished || payload.finished,
+      pendingBotMove: false,
+    });
   } catch (error) {
     next(error);
   }

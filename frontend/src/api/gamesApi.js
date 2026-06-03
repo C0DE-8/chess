@@ -33,6 +33,13 @@ export function joinGame(id) {
   });
 }
 
+export function makeMove(id, move) {
+  return apiRequest(`/api/games/${id}/move`, {
+    method: 'POST',
+    body: JSON.stringify(move),
+  });
+}
+
 export function closeGame(id) {
   return apiRequest(`/api/games/${id}/close`, {
     method: 'POST',

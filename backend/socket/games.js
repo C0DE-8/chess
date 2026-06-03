@@ -1,8 +1,7 @@
 const jwt = require('jsonwebtoken');
-const { Chess } = require('chess.js');
-const { pool, query } = require('../config/database');
+const { query } = require('../config/database');
 const { applyBotMoveIfNeeded, isBotGame } = require('../lib/bot');
-const { completeGame, getGameWithMoves } = require('../lib/game');
+const { applyPlayerMove, completeGame, getGameWithMoves } = require('../lib/game');
 
 const botJobs = new Set();
 
@@ -96,67 +95,20 @@ function socketEvents(io) {
     });
 
     socket.on('game:move', async ({ gameId, from, to, promotion }, callback) => {
-      const connection = await pool.getConnection();
       try {
-        await connection.beginTransaction();
-        const [[game]] = await connection.execute('SELECT * FROM games WHERE id = ? FOR UPDATE', [gameId]);
-        if (!game) throw new Error('Game not found.');
-        if (game.status !== 'active') throw new Error('Game is not active.');
-
-        const chess = new Chess(game.current_fen);
-        const expectedPlayerId = chess.turn() === 'w' ? game.white_player_id : game.black_player_id;
-        if (socket.user.id !== expectedPlayerId) throw new Error('It is not your turn.');
-
-        const move = chess.move({ from, to, promotion: promotion || undefined });
-        if (!move) throw new Error('Illegal move.');
-
-        const fen = chess.fen();
-        const pgn = chess.pgn();
-        const [[countRow]] = await connection.execute('SELECT COUNT(*) AS move_count FROM game_moves WHERE game_id = ?', [gameId]);
-        const moveNumber = Number(countRow.move_count) + 1;
-
-        await connection.execute(
-          `INSERT INTO game_moves
-           (game_id, player_id, move_number, from_square, to_square, promotion, san, fen_after)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [gameId, socket.user.id, moveNumber, from, to, promotion || null, move.san, fen],
-        );
-        await connection.execute('UPDATE games SET current_fen = ?, pgn = ? WHERE id = ?', [fen, pgn, gameId]);
-        await connection.commit();
-
-        let finished = null;
-        if (chess.isCheckmate()) {
-          finished = await completeGame(gameId, chess.turn() === 'w' ? 'black_win' : 'white_win', 'checkmate', socket.user.id);
-        } else if (chess.isDraw() || chess.isStalemate()) {
-          finished = await completeGame(gameId, 'draw', chess.isStalemate() ? 'stalemate' : 'draw', socket.user.id);
-        }
-
-        const pendingBotMove = !finished && isBotGame(game);
-        const updated = await getGameWithMoves(gameId);
-        const payload = {
-          game: updated,
-          lastMove: move,
-          movedBy: socket.user.id,
-          movedByName: socket.user.name,
-          san: move.san,
-          finished,
-          pendingBotMove,
-        };
+        const payload = await applyPlayerMove(gameId, socket.user, { from, to, promotion });
         const room = gameRoom(gameId);
         const roomSize = io.sockets.adapter.rooms.get(room)?.size || 0;
         logSocket('move-broadcast', socket, { gameId, room, roomSize });
         io.to(room).emit('game:move-applied', payload);
         io.to(room).emit('game:updated', payload);
-        callback?.({ ok: true, game: updated });
+        callback?.({ ok: true, game: payload.game });
 
-        if (pendingBotMove) {
+        if (payload.pendingBotMove) {
           scheduleBotMove(io, gameId);
         }
       } catch (error) {
-        await connection.rollback();
         callback?.({ ok: false, message: error.message || 'Move failed.' });
-      } finally {
-        connection.release();
       }
     });
   });

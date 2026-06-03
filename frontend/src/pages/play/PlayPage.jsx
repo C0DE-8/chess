@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { SOCKET_TRANSPORTS, SOCKET_URL, getToken } from '../../api/client';
-import { abortBotGame, analyzeGame, closeGame, getGame, joinGame, resignGame } from '../../api/gamesApi';
+import { SOCKET_ENABLED, SOCKET_TRANSPORTS, SOCKET_URL, getToken } from '../../api/client';
+import { abortBotGame, analyzeGame, closeGame, getGame, joinGame, makeMove, resignGame } from '../../api/gamesApi';
 import { useToast } from '../../components/ToastProvider';
 import ChessBoard from '../../ui/game/ChessBoard';
 import styles from './PlayPage.module.css';
@@ -55,6 +55,7 @@ export default function PlayPage({ user, games, refresh }) {
   const [game, setGame] = useState(null);
   const [message, setMessage] = useState('');
   const [isBotThinking, setIsBotThinking] = useState(false);
+  const [isSocketOnline, setIsSocketOnline] = useState(false);
   const [analysis, setAnalysis] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [dismissedWinnerGameId, setDismissedWinnerGameId] = useState(null);
@@ -128,7 +129,31 @@ export default function PlayPage({ user, games, refresh }) {
   }, [selectedId]);
 
   useEffect(() => {
-    if (!selectedId || !getToken()) return undefined;
+    if (!selectedId || isSocketOnline) return undefined;
+    let cancelled = false;
+    const syncGame = async () => {
+      try {
+        const data = await getGame(selectedId);
+        if (!cancelled) applySocketGameUpdate({ game: data.game }, { notifyMove: false });
+      } catch {
+        // Keep retrying while the page is open; transient serverless socket failures should not break play.
+      }
+    };
+
+    syncGame();
+    const interval = window.setInterval(syncGame, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [applySocketGameUpdate, isSocketOnline, selectedId]);
+
+  useEffect(() => {
+    if (!SOCKET_ENABLED || !selectedId || !getToken()) {
+      queueMicrotask(() => setIsSocketOnline(false));
+      return undefined;
+    }
+
     const socket = io(SOCKET_URL, {
       auth: { token: getToken() },
       transports: SOCKET_TRANSPORTS,
@@ -158,6 +183,7 @@ export default function PlayPage({ user, games, refresh }) {
     }
 
     socket.on('connect', () => {
+      setIsSocketOnline(true);
       console.info('[socket] connected', { id: socket.id, url: SOCKET_URL, transport: socket.io.engine.transport.name, configuredTransports: SOCKET_TRANSPORTS, gameId: selectedId });
       joinCurrentGame();
     });
@@ -170,9 +196,11 @@ export default function PlayPage({ user, games, refresh }) {
       console.info('[socket] reconnect attempt', { attempt, gameId: selectedId });
     });
     socket.on('disconnect', (reason) => {
+      setIsSocketOnline(false);
       console.info('[socket] disconnected', { reason, gameId: selectedId });
     });
     socket.on('connect_error', (error) => {
+      setIsSocketOnline(false);
       console.info('[socket] connect error', { message: error.message, url: SOCKET_URL, configuredTransports: SOCKET_TRANSPORTS, gameId: selectedId });
     });
     socket.on('game:state', (payload) => applySocketGameUpdate(payload, { notifyMove: false }));
@@ -187,6 +215,7 @@ export default function PlayPage({ user, games, refresh }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       socket.disconnect();
       socketRef.current = null;
+      setIsSocketOnline(false);
     };
   }, [applySocketGameUpdate, selectedId]);
 
@@ -286,15 +315,30 @@ export default function PlayPage({ user, games, refresh }) {
     }
 
     setIsBotThinking(isBotGame);
-    socketRef.current?.emit('game:move', { gameId: selectedId, ...move }, (response) => {
-      setMessage(response.ok ? 'Move saved.' : response.message);
-      if (!response.ok) {
+    if (isSocketOnline && socketRef.current?.connected) {
+      socketRef.current.emit('game:move', { gameId: selectedId, ...move }, (response) => {
+        setMessage(response.ok ? 'Move saved.' : response.message);
+        if (!response.ok) {
+          setIsBotThinking(false);
+          if (previousGame) setGame(previousGame);
+          notify?.(response.message || 'Move failed.', 'error');
+        }
+        if (response.game) setGame(response.game);
+      });
+      return;
+    }
+
+    makeMove(selectedId, move)
+      .then((payload) => {
+        setMessage('Move saved.');
+        applySocketGameUpdate(payload, { notifyMove: false });
+      })
+      .catch((error) => {
         setIsBotThinking(false);
         if (previousGame) setGame(previousGame);
-        notify?.(response.message || 'Move failed.', 'error');
-      }
-      if (response.game) setGame(response.game);
-    });
+        setMessage(error.message);
+        notify?.(error.message || 'Move failed.', 'error');
+      });
   }
 
   async function handleAnalyzeGame() {
